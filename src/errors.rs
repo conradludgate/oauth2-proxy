@@ -1,0 +1,73 @@
+use http::StatusCode;
+use serde::Serialize;
+use std::{convert::Infallible, error::Error, fmt::Debug};
+use warp::hyper::Uri;
+
+#[derive(Debug)]
+pub struct SessionUnauthorized;
+impl warp::reject::Reject for SessionUnauthorized {}
+
+#[derive(Debug)]
+pub struct RusotoError<E>(pub rusoto_core::RusotoError<E>);
+impl<E: Debug + Send + Sync + 'static> warp::reject::Reject for RusotoError<E> {}
+
+#[derive(Debug)]
+pub struct DynamoSerde(pub serde_dynamodb::Error);
+impl warp::reject::Reject for DynamoSerde {}
+
+#[derive(Serialize)]
+struct ErrorMessage {
+    code: u16,
+    message: String,
+}
+
+pub async fn handle(err: warp::Rejection) -> Result<Box<dyn warp::Reply>, Infallible> {
+    let code;
+    let message;
+
+    if err.is_not_found() {
+        code = StatusCode::NOT_FOUND;
+        message = "NOT_FOUND".into();
+    } else if let Some(SessionUnauthorized) = err.find() {
+        return Ok(Box::new(warp::redirect::see_other(Uri::from_static("/"))));
+    } else if let Some(e) = err.find::<warp::filters::body::BodyDeserializeError>() {
+        message = match e.source() {
+            Some(cause) => {
+                format!("BAD_REQUEST: {}", cause)
+            }
+            None => "BAD_REQUEST".into(),
+        };
+        code = StatusCode::BAD_REQUEST;
+    } else if let Some(_) = err.find::<warp::reject::MethodNotAllowed>() {
+        code = StatusCode::METHOD_NOT_ALLOWED;
+        message = "METHOD_NOT_ALLOWED".into();
+    } else {
+        eprintln!("unhandled rejection: {:?}", err);
+        code = StatusCode::INTERNAL_SERVER_ERROR;
+        message = "UNHANDLED_REJECTION".into();
+    }
+
+    let json = warp::reply::json(&ErrorMessage {
+        code: code.as_u16(),
+        message: message,
+    });
+
+    Ok(Box::new(warp::reply::with_status(json, code)))
+}
+
+pub trait Reject {
+    fn reject(self) -> warp::Rejection;
+}
+pub fn reject(err: impl Reject) -> warp::Rejection {
+    err.reject()
+}
+
+use crate::db::DynamoError;
+impl<E: Debug + Send + Sync + 'static> Reject for DynamoError<E> {
+    fn reject(self) -> warp::Rejection {
+        match self {
+            DynamoError::DynamoSerde(e) => warp::reject::custom(DynamoSerde(e)),
+            DynamoError::Rusoto(e) => warp::reject::custom(RusotoError(e)),
+        }
+    }
+}
