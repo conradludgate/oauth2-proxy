@@ -1,22 +1,19 @@
-use serde::{Deserialize, Serialize};
-
 mod helpers;
 pub use helpers::{DynamoError, DynamoPrimaryKey, DynamoSecondaryKey};
 use helpers::{DynamoIndex, DynamoTable, Query};
 
-#[derive(Serialize, Deserialize)]
+use dynomite::{Attribute, Item};
+
+#[derive(Item)]
 pub struct UserSession {
+    #[dynomite(partition_key)]
     pub session_id: String,
     pub user_id: String,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct SessionKey {
-    pub session_id: String,
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Item)]
 pub struct Token {
+    #[dynomite(partition_key)]
     pub token_id: String,
     pub user_id: String,
     pub name: String,
@@ -29,22 +26,20 @@ pub struct Token {
     pub scopes: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Item)]
 pub struct TokenUserIndex {
-    pub token_id: String,
+    #[dynomite(partition_key)]
     pub user_id: String,
-    pub name: String,
-}
 
-pub struct TokensByUserID {
-    pub user_id: String,
+    pub token_id: String,
+    pub name: String,
 }
 
 impl DynamoTable for UserSession {
     const TABLE_NAME: &'static str = "UserSessions";
 }
 
-impl DynamoPrimaryKey for SessionKey {
+impl DynamoPrimaryKey for UserSessionKey {
     type Table = UserSession;
 }
 
@@ -57,11 +52,11 @@ impl DynamoIndex for TokenUserIndex {
     const INDEX_NAME: &'static str = "TokenUserIndex";
 }
 
-impl DynamoSecondaryKey for TokensByUserID {
+impl DynamoSecondaryKey for TokenUserIndexKey {
     type Index = TokenUserIndex;
-    fn query_condition(&self) -> Result<Query, DynamoError<rusoto_dynamodb::QueryError>> {
+    fn query_condition(self) -> Result<Query, dynomite::AttributeError> {
         let key = "user_id".to_string();
-        let value = serde_dynamo::to_attribute_value(&self.user_id)?;
+        let value = self.user_id.into_attr();
         Ok(Query::Equal(key, value))
     }
 }

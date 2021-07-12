@@ -1,15 +1,21 @@
-use rusoto_dynamodb::{AttributeValue, GetItemError, QueryError, QueryInput};
-use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
+
+use dynomite::{
+    dynamodb::{DynamoDb, DynamoDbClient, GetItemError, GetItemInput, QueryError, QueryInput},
+    AttributeValue, Attributes,
+};
+use rusoto_core::Region;
+
 use thiserror::Error;
 
-pub trait DynamoTable: for<'a> Deserialize<'a> {
+pub trait DynamoTable: TryFrom<Attributes, Error = dynomite::AttributeError> {
     const TABLE_NAME: &'static str;
 }
 
 #[derive(Debug, Error)]
 pub enum DynamoError<E: std::error::Error + 'static> {
     #[error("could not parse dynamo attributes: {0}")]
-    DynamoSerde(#[from] serde_dynamo::Error),
+    ParseError(#[from] dynomite::AttributeError),
     #[error("could not connect to dynamo: {0}")]
     Rusoto(#[from] rusoto_core::RusotoError<E>),
 }
@@ -17,16 +23,13 @@ pub enum DynamoError<E: std::error::Error + 'static> {
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait DynamoPrimaryKey: Serialize {
+pub trait DynamoPrimaryKey: Into<dynomite::Attributes> {
     type Table: DynamoTable;
 
-    async fn get(&self) -> Result<Option<Self::Table>, DynamoError<GetItemError>> {
-        use rusoto_core::Region;
-        use rusoto_dynamodb::{DynamoDb, DynamoDbClient, GetItemInput};
-
+    async fn get(self) -> Result<Option<Self::Table>, DynamoError<GetItemError>> {
         let client = DynamoDbClient::new(Region::default());
 
-        let key = serde_dynamo::to_item(self)?;
+        let key = self.into();
 
         let output = client
             .get_item(GetItemInput {
@@ -36,26 +39,25 @@ pub trait DynamoPrimaryKey: Serialize {
             })
             .await?;
 
-        let item = output.item.map(serde_dynamo::from_item).transpose()?;
+        let item = output.item.map(Self::Table::try_from).transpose()?;
 
         Ok(item)
     }
 }
 
-pub trait DynamoIndex: for<'a> Deserialize<'a> {
+pub trait DynamoIndex: TryFrom<Attributes, Error = dynomite::AttributeError> {
     type Table: DynamoTable;
     const INDEX_NAME: &'static str = "TokenUserIndex";
 }
 
 #[async_trait]
-pub trait DynamoSecondaryKey {
+pub trait DynamoSecondaryKey: Sized {
     type Index: DynamoIndex;
 
-    fn query_condition(&self) -> Result<Query, DynamoError<QueryError>>;
+    fn query_condition(self) -> Result<Query, dynomite::AttributeError>;
 
-    async fn query(&self) -> Result<Vec<Self::Index>, DynamoError<QueryError>> {
+    async fn query(self) -> Result<Vec<Self::Index>, DynamoError<QueryError>> {
         use rusoto_core::Region;
-        use rusoto_dynamodb::{DynamoDb, DynamoDbClient};
 
         let client = DynamoDbClient::new(Region::default());
 
@@ -70,9 +72,10 @@ pub trait DynamoSecondaryKey {
 
         let item = output
             .items
-            .map(serde_dynamo::from_items)
-            .transpose()?
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_else(Vec::new)
+            .into_iter()
+            .map(Self::Index::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(item)
     }

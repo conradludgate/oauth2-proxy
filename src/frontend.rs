@@ -25,12 +25,12 @@ pub mod routes {
 
 mod handlers {
     use crate::{
-        db::{DynamoSecondaryKey, TokensByUserID},
+        db::{DynamoSecondaryKey, TokenUserIndexKey},
         templates::{self, HomeToken},
     };
 
     pub async fn home(user_id: String) -> Result<impl warp::Reply, warp::Rejection> {
-        let tokens = TokensByUserID { user_id }
+        let tokens = TokenUserIndexKey { user_id }
             .query()
             .await
             .map_err(crate::errors::reject)?;
@@ -56,7 +56,7 @@ mod handlers {
 mod filters {
     use crate::{
         config::Config,
-        db::{DynamoPrimaryKey, SessionKey},
+        db::{DynamoPrimaryKey, UserSessionKey},
         errors::SessionUnauthorized,
     };
     use warp::Filter;
@@ -72,7 +72,7 @@ mod filters {
     }
 
     async fn get_user(session_id: String) -> Result<String, warp::Rejection> {
-        let user_session = SessionKey { session_id }
+        let user_session = UserSessionKey { session_id }
             .get()
             .await
             .map_err(crate::errors::reject)?

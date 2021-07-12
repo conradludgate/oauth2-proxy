@@ -29,8 +29,7 @@ tracing-subscriber = "0.2"
 chrono = "0.4"
 
 # redis = { version = "0.20.2", features = ["tokio-comp"] }
-rusoto_core = "0.47.0"
-rusoto_dynamodb = "0.47.0"
-serde_dynamo = { version = "2.4.0" }
+rusoto_core = "0.46.0"
+dynomite = { git = "https://github.com/softprops/dynomite", rev = "16c61ae635f0ea182709f64f1f47afa45e3561a8" }
 
 async-trait = "0.1.50"

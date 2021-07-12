@@ -8,11 +8,11 @@ pub struct SessionUnauthorized;
 impl warp::reject::Reject for SessionUnauthorized {}
 
 #[derive(Debug)]
-pub struct RusotoError<E>(pub rusoto_core::RusotoError<E>);
+struct RusotoError<E>(rusoto_core::RusotoError<E>);
 impl<E: Debug + Send + Sync + 'static> warp::reject::Reject for RusotoError<E> {}
 
 #[derive(Debug)]
-pub struct DynamoSerde(pub serde_dynamo::Error);
+struct DynamoSerde(dynomite::AttributeError);
 impl warp::reject::Reject for DynamoSerde {}
 
 #[derive(Serialize)]
@@ -66,7 +66,7 @@ use crate::db::DynamoError;
 impl<E: std::error::Error + Debug + Send + Sync + 'static> Reject for DynamoError<E> {
     fn reject(self) -> warp::Rejection {
         match self {
-            DynamoError::DynamoSerde(e) => warp::reject::custom(DynamoSerde(e)),
+            DynamoError::ParseError(e) => warp::reject::custom(DynamoSerde(e)),
             DynamoError::Rusoto(e) => warp::reject::custom(RusotoError(e)),
         }
     }
