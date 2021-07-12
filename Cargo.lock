@@ -932,9 +932,10 @@ dependencies = [
  "rusoto_core",
  "rusoto_dynamodb",
  "serde",
- "serde_dynamodb",
+ "serde_dynamo",
  "sha2",
  "structopt",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -1509,12 +1510,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_dynamodb"
-version = "0.9.0"
+name = "serde_dynamo"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0a485bf5e371e28d4978444686ffa91830d4719b92fb31960fbd8f494816239"
+checksum = "4aca75fc0fdefc961a98a262389326fcec11d96475f5d4b8670aa9b3b92f2813"
 dependencies = [
- "bytes",
  "rusoto_dynamodb",
  "serde",
 ]

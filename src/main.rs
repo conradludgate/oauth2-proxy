@@ -19,7 +19,7 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("no global subscriber has been set");
 
-    let router = frontend::routes::router(config)
+    let router = frontend::routes::router()
         .recover(errors::handle)
         .with(warp::trace::request());
 

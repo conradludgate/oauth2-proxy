@@ -1,32 +1,22 @@
 pub mod routes {
     use super::{filters::*, handlers};
-    use crate::config::Config;
     use warp::Filter;
 
-    pub fn router(
-        config: &'static Config,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        home(config).or(new_token(config))
+    pub fn router() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        home().or(new_token())
     }
 
-    pub fn home(
-        config: &'static Config,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    pub fn home() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::get()
             .and(warp::path::end())
-            .and(with_config(config))
             .and(with_user())
             .and_then(handlers::home)
-            // .map(handlers::home)
             .with(warp::trace::named("home"))
     }
 
-    pub fn new_token(
-        config: &'static Config,
-    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    pub fn new_token() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::get()
-            .and(warp::path!("token" / "new"))
-            .and(with_config(config))
+            .and(warp::path!("token" / "new" / String))
             .and(with_user())
             .map(handlers::new_token)
             .with(warp::trace::named("new_token"))
@@ -35,19 +25,16 @@ pub mod routes {
 
 mod handlers {
     use crate::{
-        config::Config,
-        db::{DynamoSecondaryKey, TokenUserKey},
+        db::{DynamoSecondaryKey, TokensByUserID},
         templates::{self, HomeToken},
     };
 
-    pub async fn home(
-        config: &Config,
-        user_id: String,
-    ) -> Result<impl warp::Reply, warp::Rejection> {
-        let tokens = TokenUserKey { user_id }
+    pub async fn home(user_id: String) -> Result<impl warp::Reply, warp::Rejection> {
+        let tokens = TokensByUserID { user_id }
             .query()
             .await
             .map_err(crate::errors::reject)?;
+
         Ok(templates::Home {
             tokens: tokens
                 .into_iter()
@@ -59,7 +46,7 @@ mod handlers {
         })
     }
 
-    pub fn new_token(config: &Config, user_id: String) -> impl warp::Reply {
+    pub fn new_token(client: String, _: String) -> impl warp::Reply {
         templates::NewToken {
             scopes: vec!["super".into(), "awesome".into(), "scopes".into()],
         }
@@ -89,7 +76,7 @@ mod filters {
             .get()
             .await
             .map_err(crate::errors::reject)?
-            .ok_or(warp::reject::custom(SessionUnauthorized))?;
+            .ok_or_else(|| warp::reject::custom(SessionUnauthorized))?;
 
         Ok(user_session.user_id)
     }

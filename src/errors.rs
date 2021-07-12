@@ -12,7 +12,7 @@ pub struct RusotoError<E>(pub rusoto_core::RusotoError<E>);
 impl<E: Debug + Send + Sync + 'static> warp::reject::Reject for RusotoError<E> {}
 
 #[derive(Debug)]
-pub struct DynamoSerde(pub serde_dynamodb::Error);
+pub struct DynamoSerde(pub serde_dynamo::Error);
 impl warp::reject::Reject for DynamoSerde {}
 
 #[derive(Serialize)]
@@ -38,7 +38,7 @@ pub async fn handle(err: warp::Rejection) -> Result<Box<dyn warp::Reply>, Infall
             None => "BAD_REQUEST".into(),
         };
         code = StatusCode::BAD_REQUEST;
-    } else if let Some(_) = err.find::<warp::reject::MethodNotAllowed>() {
+    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
         code = StatusCode::METHOD_NOT_ALLOWED;
         message = "METHOD_NOT_ALLOWED".into();
     } else {
@@ -49,7 +49,7 @@ pub async fn handle(err: warp::Rejection) -> Result<Box<dyn warp::Reply>, Infall
 
     let json = warp::reply::json(&ErrorMessage {
         code: code.as_u16(),
-        message: message,
+        message,
     });
 
     Ok(Box::new(warp::reply::with_status(json, code)))
@@ -63,7 +63,7 @@ pub fn reject(err: impl Reject) -> warp::Rejection {
 }
 
 use crate::db::DynamoError;
-impl<E: Debug + Send + Sync + 'static> Reject for DynamoError<E> {
+impl<E: std::error::Error + Debug + Send + Sync + 'static> Reject for DynamoError<E> {
     fn reject(self) -> warp::Rejection {
         match self {
             DynamoError::DynamoSerde(e) => warp::reject::custom(DynamoSerde(e)),
