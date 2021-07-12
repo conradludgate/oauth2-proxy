@@ -33,3 +33,5 @@ rusoto_core = "0.46.0"
 dynomite = { git = "https://github.com/softprops/dynomite", rev = "16c61ae635f0ea182709f64f1f47afa45e3561a8" }
 
 async-trait = "0.1.50"
+
+uuid = "0.8"

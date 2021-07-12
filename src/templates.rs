@@ -1,4 +1,5 @@
 use askama::Template;
+use uuid::Uuid;
 
 #[derive(Template)]
 #[template(path = "home.html")]
@@ -7,7 +8,7 @@ pub struct Home {
 }
 
 pub struct HomeToken {
-    pub id: String,
+    pub id: Uuid,
     pub name: String,
 }
 
@@ -30,9 +31,9 @@ pub struct Redirect {
 
 #[derive(Template)]
 #[template(path = "token.html")]
-pub struct Token {
-    name: String,
-    id: String,
-    scopes: Vec<String>,
-    api_key: Option<String>,
+pub struct ViewToken {
+    pub name: String,
+    pub id: Uuid,
+    pub scopes: Vec<String>,
+    pub api_key: Option<String>,
 }

@@ -8,6 +8,10 @@ pub struct SessionUnauthorized;
 impl warp::reject::Reject for SessionUnauthorized {}
 
 #[derive(Debug)]
+pub struct TokenUnauthorized;
+impl warp::reject::Reject for TokenUnauthorized {}
+
+#[derive(Debug)]
 struct RusotoError<E>(rusoto_core::RusotoError<E>);
 impl<E: Debug + Send + Sync + 'static> warp::reject::Reject for RusotoError<E> {}
 

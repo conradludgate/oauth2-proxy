@@ -65,7 +65,6 @@ pub trait DynamoSecondaryKey: Sized {
         let index_name = Some(Self::Index::INDEX_NAME.to_string());
         let input = self
             .query_condition()?
-            .build()
             .build(table_name, index_name);
 
         let output = client.query(input).await?;
@@ -117,19 +116,26 @@ pub enum Query {
     And(Box<Query>, Box<Query>),
 }
 
-impl Query {
-    fn build(self) -> Condition {
+impl From<Query> for Condition {
+    fn from(q: Query) -> Self {
         let mut names = vec![];
         let mut values = vec![];
-        let expr = self._build(&mut names, &mut values);
-        Condition {
+        let expr = q.__enrich(&mut names, &mut values);
+        Self {
             names,
             values,
             expr,
         }
     }
+}
 
-    fn _build(self, names: &mut Vec<String>, values: &mut Vec<AttributeValue>) -> String {
+impl Query {
+    fn build(self, table_name: String, index_name: Option<String>) -> QueryInput {
+        let cond: Condition = self.into();
+        cond.build(table_name, index_name)
+    }
+
+    fn __enrich(self, names: &mut Vec<String>, values: &mut Vec<AttributeValue>) -> String {
         match self {
             Query::Equal(name, value) => {
                 let i = names.len();
@@ -141,8 +147,8 @@ impl Query {
                 format!("#{} = :{}", i, j)
             }
             Query::And(lhs, rhs) => {
-                let lhs = lhs._build(names, values);
-                let rhs = rhs._build(names, values);
+                let lhs = lhs.__enrich(names, values);
+                let rhs = rhs.__enrich(names, values);
 
                 format!("({}) AND ({})", lhs, rhs)
             }

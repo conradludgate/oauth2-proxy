@@ -6,9 +6,9 @@
   <body>
     <ul>
       {% for token in tokens %}
-        <li><a href="/token/id/{{ token.id }}">View token {{ token.name }}</a></li>
+        <li><a href="/token/{{ token.id }}">View token {{ token.name }}</a></li>
       {% endfor %}
     </ul>
-    <a href="/token/new">Create a new token</a>
+    <a href="/token/spotify">Create a new spotify token</a>
   </body>
 </html>
