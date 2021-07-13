@@ -1,15 +1,10 @@
-use http::StatusCode;
+use http::{StatusCode, Uri};
 use serde::Serialize;
 use std::{convert::Infallible, error::Error, fmt::Debug};
-use warp::hyper::Uri;
 
 #[derive(Debug)]
 pub struct SessionUnauthorized;
 impl warp::reject::Reject for SessionUnauthorized {}
-
-#[derive(Debug)]
-pub struct TokenUnauthorized;
-impl warp::reject::Reject for TokenUnauthorized {}
 
 #[derive(Debug)]
 struct RusotoError<E>(rusoto_core::RusotoError<E>);
@@ -18,6 +13,14 @@ impl<E: Debug + Send + Sync + 'static> warp::reject::Reject for RusotoError<E> {
 #[derive(Debug)]
 struct DynamoSerde(dynomite::AttributeError);
 impl warp::reject::Reject for DynamoSerde {}
+
+#[derive(Debug)]
+struct UrlParseError2(http::uri::InvalidUri);
+impl warp::reject::Reject for UrlParseError2 {}
+
+#[derive(Debug)]
+struct RequestError(reqwest::Error);
+impl warp::reject::Reject for RequestError {}
 
 #[derive(Serialize)]
 struct ErrorMessage {
@@ -73,5 +76,17 @@ impl<E: std::error::Error + Debug + Send + Sync + 'static> Reject for DynamoErro
             DynamoError::ParseError(e) => warp::reject::custom(DynamoSerde(e)),
             DynamoError::Rusoto(e) => warp::reject::custom(RusotoError(e)),
         }
+    }
+}
+
+impl Reject for http::uri::InvalidUri {
+    fn reject(self) -> warp::Rejection {
+        warp::reject::custom(UrlParseError2(self))
+    }
+}
+
+impl Reject for reqwest::Error {
+    fn reject(self) -> warp::Rejection {
+        warp::reject::custom(RequestError(self))
     }
 }

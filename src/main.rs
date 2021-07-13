@@ -5,6 +5,8 @@ mod errors;
 mod frontend;
 mod templates;
 mod db;
+mod api;
+mod signing;
 
 use tracing_subscriber::fmt::format::FmtSpan;
 use warp::Filter;
@@ -19,7 +21,10 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("no global subscriber has been set");
 
+    tracing_log::LogTracer::init().expect("could not init logger");
+
     let router = frontend::routes::router()
+        .or(api::routes::router())
         .recover(errors::handle)
         .with(warp::trace::request());
 

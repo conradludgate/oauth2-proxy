@@ -38,7 +38,6 @@ mod handlers {
 
     use crate::{
         db::{DynamoPrimaryKey, DynamoSecondaryKey, ProviderKey, TokenKey, TokenUserIndexKey},
-        errors::TokenUnauthorized,
         templates::{self, HomeToken},
     };
 
@@ -67,16 +66,16 @@ mod handlers {
             .get()
             .await
             .map_err(crate::errors::reject)?
-            .ok_or_else(|| warp::reject::custom(TokenUnauthorized))?;
+            .ok_or_else(warp::reject::not_found)?;
 
         if token.user_id != user_id {
-            return Err(warp::reject::custom(TokenUnauthorized));
+            return Err(warp::reject::not_found());
         }
 
         Ok(templates::ViewToken {
             name: token.name,
             id: token_id,
-            scopes: token.scopes,
+            scopes: token.oauth.scopes,
             api_key: None,
         })
     }

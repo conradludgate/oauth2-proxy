@@ -2,7 +2,8 @@ mod helpers;
 pub use helpers::{DynamoError, DynamoPrimaryKey, DynamoSecondaryKey};
 use helpers::{DynamoIndex, DynamoTable, Query};
 
-use dynomite::{Attribute, Item};
+use dynomite::{Attribute, Attributes, Item};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Item)]
@@ -20,10 +21,16 @@ pub struct Token {
     pub name: String,
     // pub api_key: String,
 
-    // pub access_token: String,
-    // pub refresh_token: String,
-    // pub expires: chrono::DateTime<chrono::Utc>,
-    // pub token_type: String,
+    pub provider_id: String,
+    pub oauth: OauthToken
+}
+
+#[derive(Serialize, Deserialize, Attributes, Debug)]
+pub struct OauthToken {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires: chrono::DateTime<chrono::Utc>,
+    pub token_type: String,
     pub scopes: Vec<String>,
 }
 
@@ -36,13 +43,39 @@ pub struct TokenUserIndex {
     pub name: String,
 }
 
+pub struct Uri(pub http::Uri);
+
+impl From<Uri> for http::Uri {
+    fn from(u: Uri) -> Self {
+        u.0
+    }
+}
+
+impl From<http::Uri> for Uri {
+    fn from(u: http::Uri) -> Self {
+        Self(u)
+    }
+}
+
+impl Attribute for Uri {
+    fn into_attr(self) -> dynomite::AttributeValue {
+        self.0.to_string().into_attr()
+    }
+    fn from_attr(value: dynomite::AttributeValue) -> Result<Self, dynomite::AttributeError> {
+        let s = String::from_attr(value)?;
+        let u = s.parse().map_err(|_| dynomite::AttributeError::InvalidFormat)?;
+        Ok(Self(u))
+    }
+}
+
 #[derive(Item)]
 pub struct Provider {
     #[dynomite(partition_key)]
     pub provider_id: String,
     pub client_id: String,
     pub client_secret: String,
-
+    pub auth_url: String,
+    pub token_url: String,
     pub redirect_uri: String,
     pub scopes: Vec<String>,
 }

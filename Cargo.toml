@@ -8,8 +8,9 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
+serde_urlencoded = "0.7"
 
-oauth2 = "4.1.0"
+reqwest = { version = "0.11", features = ["json"] }
 
 hmac = "0.11.0"
 sha2 = "0.9.5"
@@ -25,6 +26,7 @@ askama_warp = "0.11"
 
 tracing = "0.1"
 tracing-subscriber = "0.2"
+tracing-log = "0.1.2"
 
 chrono = "0.4"
 
@@ -35,3 +37,4 @@ dynomite = { git = "https://github.com/softprops/dynomite", rev = "16c61ae635f0e
 async-trait = "0.1.50"
 
 uuid = "0.8"
+base64 = "0.13"
