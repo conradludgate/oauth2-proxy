@@ -1,15 +1,24 @@
 use std::convert::TryFrom;
 
-use dynomite::{
-    dynamodb::{DynamoDb, DynamoDbClient, GetItemError, GetItemInput, QueryError, QueryInput},
-    AttributeValue, Attributes,
-};
+use dynomite::{AttributeValue, Attributes, dynamodb::{DynamoDb, DynamoDbClient, GetItemError, GetItemInput, PutItemError, PutItemInput, QueryError, QueryInput}};
 use rusoto_core::Region;
 
 use thiserror::Error;
 
+#[async_trait]
 pub trait DynamoTable: TryFrom<Attributes, Error = dynomite::AttributeError> {
     const TABLE_NAME: &'static str;
+
+    async fn save(self) -> Result<(), DynamoError<PutItemError>> where Self: Into<Attributes> {
+        let client = DynamoDbClient::new(Region::default());
+        let input = PutItemInput {
+            table_name: Self::TABLE_NAME.to_owned(),
+            item: self.into(),
+            ..Default::default()
+        };
+        client.put_item(input).await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Error)]

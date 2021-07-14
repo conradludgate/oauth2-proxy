@@ -1,127 +1,141 @@
-pub mod routes {
-    use super::{filters::*, handlers};
-    use uuid::Uuid;
-    use warp::Filter;
+use std::str::FromStr;
 
-    pub fn router() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        home().or(view_token()).or(new_token())
-    }
+use dynomite::dynamodb::{GetItemError, QueryError};
+use rocket::{
+    http::{Cookie, CookieJar, Status},
+    request::{FromParam, FromRequest, Outcome, Request},
+    response::Responder,
+    Route,
+};
+use uuid::Uuid;
 
-    pub fn home() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::get()
-            .and(warp::path::end())
-            .and(with_user())
-            .and_then(handlers::home)
-            .with(warp::trace::named("home"))
-    }
+use crate::{
+    db::{
+        DynamoError, DynamoPrimaryKey, DynamoSecondaryKey, ProviderKey, TokenKey,
+        TokenUserIndexKey, UserSessionKey,
+    },
+    templates,
+};
 
-    pub fn view_token() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone
-    {
-        warp::get()
-            .and(warp::path!("token" / Uuid))
-            .and(with_user())
-            .and_then(handlers::view_token)
-            .with(warp::trace::named("view_token"))
-    }
+pub fn routes() -> Vec<Route> {
+    routes![home, session, view_token, new_token]
+}
 
-    pub fn new_token() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::get()
-            .and(warp::path!("token" / String))
-            .and(with_user())
-            .and_then(handlers::new_token)
-            .with(warp::trace::named("new_token"))
+struct UserID(String);
+#[async_trait]
+impl<'r> FromRequest<'r> for UserID {
+    type Error = &'static str;
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let session_id = match request.cookies().get_private("session") {
+            Some(session_id) => session_id,
+            None => return Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
+        };
+
+        let session_id = match session_id.value().to_string().parse() {
+            Ok(session_id) => session_id,
+            Err(_) => return Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
+        };
+
+        let user_session = UserSessionKey { session_id }.get().await;
+        match user_session {
+            Ok(Some(user_session)) => Outcome::Success(UserID(user_session.user_id)),
+            Ok(None) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
+            Err(_) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
+        }
     }
 }
 
-mod handlers {
-    use uuid::Uuid;
+struct TokenID(Uuid);
+#[async_trait]
+impl<'a> FromParam<'a> for TokenID {
+    type Error = <Uuid as FromStr>::Err;
 
-    use crate::{
-        db::{DynamoPrimaryKey, DynamoSecondaryKey, ProviderKey, TokenKey, TokenUserIndexKey},
-        templates::{self, HomeToken},
+    fn from_param(param: &'a str) -> Result<Self, Self::Error> {
+        param.parse().map(TokenID)
+    }
+}
+
+impl<'r, 'o: 'r, E: std::error::Error + 'static> Responder<'r, 'o> for DynamoError<E> {
+    fn respond_to(self, _: &'r Request<'_>) -> rocket::response::Result<'o> {
+        error!("{}", self);
+        Err(Status::InternalServerError)
+    }
+}
+
+#[get("/")]
+async fn home(user_id: UserID) -> Result<templates::Home, DynamoError<QueryError>> {
+    let tokens = TokenUserIndexKey { user_id: user_id.0 }.query().await?;
+
+    Ok(templates::Home {
+        tokens: tokens
+            .into_iter()
+            .map(|token| templates::HomeToken {
+                id: token.token_id,
+                name: token.name,
+            })
+            .collect(),
+    })
+}
+
+#[get("/session")]
+fn session(cookies: &CookieJar<'_>) {
+    cookies.add_private(Cookie::new(
+        "session",
+        "072fd190-745f-4824-a69b-c71200f2271c",
+    ));
+}
+
+#[get("/token/<token_id>")]
+async fn view_token(
+    token_id: TokenID,
+    user_id: UserID,
+) -> Result<Option<templates::ViewToken>, DynamoError<GetItemError>> {
+    let token = TokenKey {
+        token_id: token_id.0,
+    }
+    .get()
+    .await?;
+    let token = match token {
+        Some(token) => token,
+        None => return Ok(None),
     };
 
-    pub async fn home(user_id: Uuid) -> Result<impl warp::Reply, warp::Rejection> {
-        let tokens = TokenUserIndexKey { user_id }
-            .query()
-            .await
-            .map_err(crate::errors::reject)?;
-
-        Ok(templates::Home {
-            tokens: tokens
-                .into_iter()
-                .map(|token| HomeToken {
-                    id: token.token_id,
-                    name: token.name,
-                })
-                .collect(),
-        })
-    }
-
-    pub async fn view_token(
-        token_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<impl warp::Reply, warp::Rejection> {
-        let token = TokenKey { token_id }
-            .get()
-            .await
-            .map_err(crate::errors::reject)?
-            .ok_or_else(warp::reject::not_found)?;
-
-        if token.user_id != user_id {
-            return Err(warp::reject::not_found());
-        }
-
-        Ok(templates::ViewToken {
+    if token.user_id != user_id.0 {
+        Ok(None)
+    } else {
+        Ok(Some(templates::ViewToken {
             name: token.name,
-            id: token_id,
+            id: token.token_id,
             scopes: token.oauth.scopes,
             api_key: None,
-        })
-    }
-
-    pub async fn new_token(
-        provider_id: String,
-        _: Uuid,
-    ) -> Result<impl warp::Reply, warp::Rejection> {
-        let provider = ProviderKey { provider_id }
-            .get()
-            .await
-            .map_err(crate::errors::reject)?
-            .ok_or_else(warp::reject::not_found)?;
-
-        Ok(templates::NewToken {
-            scopes: provider.scopes,
-        })
+        }))
     }
 }
 
-mod filters {
-    use crate::{
-        config::Config,
-        db::{DynamoPrimaryKey, UserSessionKey},
-        errors::SessionUnauthorized,
-    };
-    use uuid::Uuid;
-    use warp::Filter;
-
-    pub fn with_user() -> impl Filter<Extract = (Uuid,), Error = warp::Rejection> + Clone {
-        warp::cookie("session").and_then(get_user)
-    }
-
-    pub fn with_config(
-        config: &'static Config,
-    ) -> impl Filter<Extract = (&'static Config,), Error = std::convert::Infallible> + Clone {
-        warp::any().map(move || config)
-    }
-
-    async fn get_user(session_id: Uuid) -> Result<Uuid, warp::Rejection> {
-        let user_session = UserSessionKey { session_id }
-            .get()
-            .await
-            .map_err(crate::errors::reject)?
-            .ok_or_else(|| warp::reject::custom(SessionUnauthorized))?;
-
-        Ok(user_session.user_id)
+#[get("/token/spotify")]
+fn new_token() -> templates::NewToken {
+    templates::NewToken {
+        scopes: vec![
+            "ugc-image-upload".to_owned(),
+            "user-read-recently-played".to_owned(),
+            "user-top-read".to_owned(),
+            "user-read-playback-position".to_owned(),
+            "user-read-playback-state".to_owned(),
+            "user-modify-playback-state".to_owned(),
+            "user-read-currently-playing".to_owned(),
+            "app-remote-control".to_owned(),
+            "streaming".to_owned(),
+            "playlist-modify-public".to_owned(),
+            "playlist-modify-private".to_owned(),
+            "playlist-read-private".to_owned(),
+            "playlist-read-collaborative".to_owned(),
+            "user-follow-modify".to_owned(),
+            "user-follow-read".to_owned(),
+            "user-library-modify".to_owned(),
+            "user-library-read".to_owned(),
+            "user-read-email".to_owned(),
+            "user-read-private".to_owned(),
+        ],
     }
 }

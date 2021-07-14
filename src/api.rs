@@ -1,99 +1,164 @@
-pub mod routes {
-    use super::handlers;
-    use warp::Filter;
+use std::{collections::HashMap};
 
-    pub fn router() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        login().or(callback())
-    }
+use crate::{config::Config, db::{DynamoError, DynamoTable, ProviderKey, UserSession}, templates};
+use dynomite::dynamodb::{GetItemError, PutItemError};
+use rocket::{Route, State, http::{Cookie, CookieJar, SameSite, Status}, request::Request, response::{Redirect, Responder}};
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use time::Duration;
+use uuid::Uuid;
 
-    pub fn login() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::get()
-            .and(warp::path!("api" / "login" / String))
-            .and_then(handlers::login)
-            .with(warp::trace::named("login"))
-    }
+pub fn routes() -> Vec<Route> {
+    routes![login, callback, callback_error]
+}
 
-    pub fn callback() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-        warp::get()
-            .and(warp::path!("api" / "callback" / String))
-            .and(warp::query())
-            .and_then(handlers::callback)
-            .with(warp::trace::named("callback"))
+#[derive(Serialize, Deserialize)]
+struct AuthState {
+    state: String,
+    scopes: Vec<String>,
+    login: bool,
+}
+
+#[get("/login/spotify")]
+async fn login(
+    config: &State<Config>,
+    cookies: &CookieJar<'_>,
+) -> Result<Option<Redirect>, DynamoError<GetItemError>> {
+    let auth_url = "https://accounts.spotify.com/authorize";
+    let redirect_uri = format!("{}/api/callback/{}", config.base_url, "spotify");
+
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let mut state = [0u8; 24];
+    rng.try_fill(&mut state).unwrap();
+    let state = base64::encode(&state);
+
+    let mut query: HashMap<&str, &str> = HashMap::new();
+    query.insert("response_type", "code");
+    query.insert("client_id", &config.spotify.client_id);
+    query.insert("redirect_uri", &redirect_uri);
+    query.insert("state", &state);
+    let query = serde_urlencoded::to_string(query).unwrap();
+    let url = format!("{}?{}", auth_url, query);
+
+    let auth_state = AuthState {
+        state,
+        scopes: vec![],
+        login: true,
+    };
+    let auth_state = serde_json::to_string(&auth_state).unwrap();
+
+    let mut cookie = Cookie::new("state", auth_state);
+    cookie.set_same_site(SameSite::Lax);
+    cookie.set_max_age(Duration::minutes(1));
+    cookies.add_private(cookie);
+
+    Ok(Some(Redirect::to(url)))
+}
+
+#[derive(Debug, Error)]
+enum CallbackError {
+    #[error("error making http request {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("error making db request {0}")]
+    Dynamo(#[from] DynamoError<PutItemError>),
+    #[error("error decoding json {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("{0}")]
+    Status(Status),
+}
+
+impl<'r, 'o: 'r> Responder<'r, 'o> for CallbackError {
+    fn respond_to(self, r: &'r Request<'_>) -> rocket::response::Result<'o> {
+        match self {
+            CallbackError::Dynamo(d) => d.respond_to(r),
+            CallbackError::Reqwest(e) => {
+                error!("{}", e);
+                Err(Status::InternalServerError)
+            }
+            CallbackError::Status(s) => Err(s),
+            CallbackError::Json(j) => {
+                error!("{}", j);
+                Err(Status::InternalServerError)
+            }
+        }
     }
 }
 
-mod handlers {
-    use std::collections::HashMap;
+#[get("/callback/spotify?<code>&<state>")]
+async fn callback(
+    config: &State<Config>,
+    cookies: &CookieJar<'_>,
+    code: String,
+    state: String,
+) -> Result<templates::Redirect, CallbackError> {
+    let token_url = "https://accounts.spotify.com/api/token";
+    let redirect_uri = format!("{}/api/callback/{}", config.base_url, "spotify");
 
-    use serde::Deserialize;
+    let auth_state = cookies
+        .get_private("state")
+        .ok_or(CallbackError::Status(Status::ImATeapot))?;
+    let auth_state: AuthState = serde_json::from_str(auth_state.value())?;
 
-    use crate::{
-        db::{DynamoPrimaryKey, OauthToken, ProviderKey},
-        errors::reject,
+    if auth_state.state != state {
+        error!("invalid state");
+        return Err(CallbackError::Status(Status::BadRequest));
+    }
+
+    let client = reqwest::Client::new();
+
+    #[derive(Deserialize, Debug)]
+    pub struct AccessToken {
+        pub access_token: String,
+        pub refresh_token: String,
+        pub expires_in: usize,
+        pub token_type: String,
+    }
+
+    let token: AccessToken = client
+        .post(token_url)
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", &code),
+            ("redirect_uri", &redirect_uri),
+        ])
+        .basic_auth(
+            &config.spotify.client_id,
+            Some(&config.spotify.client_secret),
+        )
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    #[derive(Debug, Deserialize)]
+    struct Me {
+        id: String,
+    }
+    let me: Me = client
+        .get("https://api.spotify.com/v1/me")
+        .bearer_auth(token.access_token)
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    let session = UserSession {
+        user_id: me.id,
+        session_id: Uuid::new_v4(),
     };
 
-    pub async fn login(provider_id: String) -> Result<impl warp::Reply, warp::Rejection> {
-        let provider = ProviderKey { provider_id }
-            .get()
-            .await
-            .map_err(reject)?
-            .ok_or_else(warp::reject::not_found)?;
+    cookies.add_private(Cookie::new("session", session.session_id.to_string()));
 
-        let mut query: HashMap<&str, &str> = HashMap::new();
-        query.insert("response_type", "code");
-        query.insert("client_id", provider.client_id.as_str());
-        query.insert("redirect_uri", provider.redirect_uri.as_str());
-        query.insert("state", "foo");
-        let query = serde_urlencoded::to_string(query).unwrap();
-        let url = format!("{}?{}", provider.auth_url, query);
+    session.save().await?;
 
-        Ok(warp::redirect::see_other(
-            url.parse::<http::Uri>().map_err(reject)?,
-        ))
-    }
+    Ok(templates::Redirect{
+        text: "Click here to finish logging in".to_owned(),
+        path: "/".to_owned(),
+    })
+}
 
-    #[derive(Deserialize)]
-    pub struct CallbackQuery {
-        code: String,
-        state: String,
-    }
-
-    pub async fn callback(
-        provider_id: String,
-        callback_query: CallbackQuery,
-    ) -> Result<impl warp::Reply, warp::Rejection> {
-        let provider = ProviderKey { provider_id }
-            .get()
-            .await
-            .map_err(reject)?
-            .ok_or_else(warp::reject::not_found)?;
-
-        let client = reqwest::Client::new();
-
-        #[derive(Deserialize, Debug)]
-        pub struct Token {
-            pub access_token: String,
-            pub refresh_token: String,
-            pub expires_in: usize,
-            pub token_type: String,
-        }
-
-        let token: Token = client
-            .post(provider.token_url)
-            .form(&[
-                ("grant_type", "authorization_code"),
-                ("code", callback_query.code.as_str()),
-                ("redirect_uri", provider.redirect_uri.as_str()),
-            ])
-            .basic_auth(provider.client_id, Some(provider.client_secret)).send()
-            .await
-            .map_err(reject)?
-            .json()
-            .await
-            .map_err(reject)?;
-
-        println!("{:?}", token);
-
-        Ok(warp::reply())
-    }
+#[get("/callback/spotify?<error>&<state>", rank = 2)]
+fn callback_error(error: String, state: String) -> Status {
+    Status::Unauthorized
 }

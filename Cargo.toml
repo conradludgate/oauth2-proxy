@@ -9,6 +9,7 @@ edition = "2018"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_urlencoded = "0.7"
+serde_json = "1.0"
 
 reqwest = { version = "0.11", features = ["json"] }
 
@@ -18,15 +19,10 @@ sha2 = "0.9.5"
 structopt = "0.3"
 thiserror = "1.0"
 
-warp = "0.3.1"
-http = "0.2"
+rocket = { version = "0.5.0-rc.1", features = ["secrets"] }
 
-askama = { version = "0.10", features = ["with-warp"] }
-askama_warp = "0.11"
-
-tracing = "0.1"
-tracing-subscriber = "0.2"
-tracing-log = "0.1.2"
+askama = { git = "https://github.com/djc/askama" }
+askama_rocket = { git = "https://github.com/djc/askama" }
 
 chrono = "0.4"
 
@@ -38,3 +34,8 @@ async-trait = "0.1.50"
 
 uuid = "0.8"
 base64 = "0.13"
+
+toml = "0.5.8"
+
+rand = "0.8.4"
+time = "0.2"

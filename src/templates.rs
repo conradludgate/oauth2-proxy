@@ -25,8 +25,8 @@ pub struct NewToken {
 #[derive(Template)]
 #[template(path = "redirect.html")]
 pub struct Redirect {
-    path: String,
-    text: String,
+    pub path: String,
+    pub text: String,
 }
 
 #[derive(Template)]

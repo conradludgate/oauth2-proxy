@@ -1,14 +1,29 @@
-use structopt::StructOpt;
+use std::fs::File;
+use std::io::Read;
+use std::error::Error;
+use serde::Deserialize;
 
-#[derive(StructOpt, Debug)]
-pub struct Config {
-    #[structopt(short, long, default_value = "27228")]
-    pub port: u16,
-
-    #[structopt(env, default_value = "info,warp=debug")]
-    pub rust_log: String,
+fn base_url() -> String {
+    "http://localhost:27228".to_owned()
 }
 
-pub fn parse() -> Config {
-    Config::from_args()
+#[derive(Deserialize)]
+pub struct Config {
+    #[serde(default = "base_url")]
+    pub base_url: String,
+    pub spotify: Client,
+}
+
+#[derive(Deserialize)]
+pub struct Client {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+pub fn parse() -> Result<Config, Box<dyn Error>> {
+    let mut file = File::open("oauth2.toml")?;
+    let mut s = String::new();
+    file.read_to_string(&mut s)?;
+
+    Ok(toml::from_str(&s)?)
 }
