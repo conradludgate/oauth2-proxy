@@ -42,18 +42,6 @@ pub struct TokenUserIndex {
     pub name: String,
 }
 
-#[derive(Item)]
-pub struct Provider {
-    #[dynomite(partition_key)]
-    pub provider_id: String,
-    pub client_id: String,
-    pub client_secret: String,
-    pub auth_url: String,
-    pub token_url: String,
-    pub redirect_uri: String,
-    pub scopes: Vec<String>,
-}
-
 impl DynamoTable for UserSession {
     const TABLE_NAME: &'static str = "UserSessions";
 }
@@ -82,12 +70,4 @@ impl DynamoSecondaryKey for TokenUserIndexKey {
         let value = self.user_id.into_attr();
         Ok(Query::Equal(key, value))
     }
-}
-
-impl DynamoTable for Provider {
-    const TABLE_NAME: &'static str = "Providers";
-}
-
-impl DynamoPrimaryKey for ProviderKey {
-    type Table = Provider;
 }

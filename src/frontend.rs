@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     db::{
-        DynamoError, DynamoPrimaryKey, DynamoSecondaryKey, ProviderKey, TokenKey,
+        DynamoError, DynamoPrimaryKey, DynamoSecondaryKey, TokenKey, TokenUserIndex,
         TokenUserIndexKey, UserSessionKey,
     },
     templates,
@@ -39,9 +39,8 @@ impl<'r> FromRequest<'r> for UserID {
 
         let user_session = UserSessionKey { session_id }.get().await;
         match user_session {
-            Ok(Some(user_session)) => Outcome::Success(UserID(user_session.user_id)),
-            Ok(None) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
-            Err(_) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
+            Ok(Some(user_session)) => Outcome::Success(Self(user_session.user_id)),
+            Ok(None) | Err(_) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
         }
     }
 }
@@ -65,7 +64,7 @@ impl<'r, 'o: 'r, E: std::error::Error + 'static> Responder<'r, 'o> for DynamoErr
 
 #[get("/")]
 async fn home(user_id: UserID) -> Result<templates::Home, DynamoError<QueryError>> {
-    let tokens = TokenUserIndexKey { user_id: user_id.0 }.query().await?;
+    let tokens: Vec<TokenUserIndex> = TokenUserIndexKey { user_id: user_id.0 }.query().await?;
 
     Ok(templates::Home {
         tokens: tokens
@@ -75,6 +74,10 @@ async fn home(user_id: UserID) -> Result<templates::Home, DynamoError<QueryError
                 name: token.name,
             })
             .collect(),
+        providers: vec![templates::Provider {
+            slug: "spotify".to_owned(),
+            name: "Spotify".to_owned(),
+        }],
     })
 }
 
@@ -101,15 +104,15 @@ async fn view_token(
         None => return Ok(None),
     };
 
-    if token.user_id != user_id.0 {
-        Ok(None)
-    } else {
+    if token.user_id == user_id.0 {
         Ok(Some(templates::ViewToken {
             name: token.name,
             id: token.token_id,
             scopes: token.oauth.scopes,
             api_key: None,
         }))
+    } else {
+        Ok(None)
     }
 }
 

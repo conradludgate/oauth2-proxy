@@ -1,8 +1,17 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
-use crate::{config::Config, db::{DynamoError, DynamoTable, ProviderKey, UserSession}, templates};
-use dynomite::dynamodb::{GetItemError, PutItemError};
-use rocket::{Route, State, http::{Cookie, CookieJar, SameSite, Status}, request::Request, response::{Redirect, Responder}};
+use crate::{
+    config::Config,
+    db::{DynamoError, DynamoTable, UserSession},
+    templates,
+};
+use dynomite::dynamodb::PutItemError;
+use rocket::{
+    http::{Cookie, CookieJar, SameSite, Status},
+    request::Request,
+    response::{Redirect, Responder},
+    Route, State,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use time::Duration;
@@ -20,16 +29,14 @@ struct AuthState {
 }
 
 #[get("/login/spotify")]
-async fn login(
-    config: &State<Config>,
-    cookies: &CookieJar<'_>,
-) -> Result<Option<Redirect>, DynamoError<GetItemError>> {
+fn login(config: &State<Config>, cookies: &CookieJar<'_>) -> Redirect {
+    use rand::Rng;
+
     let auth_url = "https://accounts.spotify.com/authorize";
     let redirect_uri = format!("{}/api/callback/{}", config.base_url, "spotify");
 
-    use rand::Rng;
     let mut rng = rand::thread_rng();
-    let mut state = [0u8; 24];
+    let mut state = [0; 24];
     rng.try_fill(&mut state).unwrap();
     let state = base64::encode(&state);
 
@@ -53,7 +60,7 @@ async fn login(
     cookie.set_max_age(Duration::minutes(1));
     cookies.add_private(cookie);
 
-    Ok(Some(Redirect::to(url)))
+    Redirect::to(url)
 }
 
 #[derive(Debug, Error)]
@@ -89,9 +96,22 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for CallbackError {
 async fn callback(
     config: &State<Config>,
     cookies: &CookieJar<'_>,
-    code: String,
-    state: String,
+    code: &str,
+    state: &str,
 ) -> Result<templates::Redirect, CallbackError> {
+    #[derive(Deserialize, Debug)]
+    pub struct AccessToken {
+        pub access_token: String,
+        pub refresh_token: String,
+        pub expires_in: usize,
+        pub token_type: String,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Me {
+        id: String,
+    }
+
     let token_url = "https://accounts.spotify.com/api/token";
     let redirect_uri = format!("{}/api/callback/{}", config.base_url, "spotify");
 
@@ -107,19 +127,11 @@ async fn callback(
 
     let client = reqwest::Client::new();
 
-    #[derive(Deserialize, Debug)]
-    pub struct AccessToken {
-        pub access_token: String,
-        pub refresh_token: String,
-        pub expires_in: usize,
-        pub token_type: String,
-    }
-
     let token: AccessToken = client
         .post(token_url)
         .form(&[
             ("grant_type", "authorization_code"),
-            ("code", &code),
+            ("code", code),
             ("redirect_uri", &redirect_uri),
         ])
         .basic_auth(
@@ -131,10 +143,6 @@ async fn callback(
         .json()
         .await?;
 
-    #[derive(Debug, Deserialize)]
-    struct Me {
-        id: String,
-    }
     let me: Me = client
         .get("https://api.spotify.com/v1/me")
         .bearer_auth(token.access_token)
@@ -152,13 +160,14 @@ async fn callback(
 
     session.save().await?;
 
-    Ok(templates::Redirect{
+    Ok(templates::Redirect {
         text: "Click here to finish logging in".to_owned(),
         path: "/".to_owned(),
     })
 }
 
-#[get("/callback/spotify?<error>&<state>", rank = 2)]
-fn callback_error(error: String, state: String) -> Status {
+#[get("/callback/spotify?<error>", rank = 2)]
+fn callback_error(error: &str) -> Status {
+    warn!("callback_error: {}", error);
     Status::Unauthorized
 }

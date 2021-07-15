@@ -1,4 +1,6 @@
-#![feature(once_cell)]
+#![allow(clippy::nonstandard_macro_braces)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
 
 mod api;
 mod config;
@@ -25,23 +27,3 @@ fn rocket() -> _ {
         .mount("/", frontend::routes())
         .mount("/api", api::routes())
 }
-
-// #[tokio::main]
-// async fn main() {
-//     let config = Box::leak(Box::new(config::parse()));
-
-//     let subscriber = tracing_subscriber::fmt()
-//         .with_env_filter(&config.rust_log)
-//         .with_span_events(FmtSpan::CLOSE)
-//         .finish();
-//     tracing::subscriber::set_global_default(subscriber).expect("no global subscriber has been set");
-
-//     tracing_log::LogTracer::init().expect("could not init logger");
-
-//     let router = frontend::routes::router()
-//         .or(api::routes::router())
-//         .recover(errors::handle)
-//         .with(warp::trace::request());
-
-//     warp::serve(router).run(([127, 0, 0, 1], config.port)).await;
-// }

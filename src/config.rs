@@ -1,7 +1,7 @@
+use serde::Deserialize;
+use std::error::Error;
 use std::fs::File;
 use std::io::Read;
-use std::error::Error;
-use serde::Deserialize;
 
 fn base_url() -> String {
     "http://localhost:27228".to_owned()

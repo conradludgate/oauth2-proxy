@@ -1,6 +1,12 @@
 use std::convert::TryFrom;
 
-use dynomite::{AttributeValue, Attributes, dynamodb::{DynamoDb, DynamoDbClient, GetItemError, GetItemInput, PutItemError, PutItemInput, QueryError, QueryInput}};
+use dynomite::{
+    dynamodb::{
+        DynamoDb, DynamoDbClient, GetItemError, GetItemInput, PutItemError, PutItemInput,
+        QueryError, QueryInput,
+    },
+    AttributeValue, Attributes,
+};
 use rusoto_core::Region;
 
 use thiserror::Error;
@@ -9,12 +15,15 @@ use thiserror::Error;
 pub trait DynamoTable: TryFrom<Attributes, Error = dynomite::AttributeError> {
     const TABLE_NAME: &'static str;
 
-    async fn save(self) -> Result<(), DynamoError<PutItemError>> where Self: Into<Attributes> {
+    async fn save(self) -> Result<(), DynamoError<PutItemError>>
+    where
+        Self: Into<Attributes>,
+    {
         let client = DynamoDbClient::new(Region::default());
         let input = PutItemInput {
             table_name: Self::TABLE_NAME.to_owned(),
             item: self.into(),
-            ..Default::default()
+            ..PutItemInput::default()
         };
         client.put_item(input).await?;
         Ok(())
@@ -44,7 +53,7 @@ pub trait DynamoPrimaryKey: Into<dynomite::Attributes> {
             .get_item(GetItemInput {
                 table_name: Self::Table::TABLE_NAME.to_string(),
                 key,
-                ..Default::default()
+                ..GetItemInput::default()
             })
             .await?;
 
@@ -72,9 +81,7 @@ pub trait DynamoSecondaryKey: Sized {
 
         let table_name = <Self::Index as DynamoIndex>::Table::TABLE_NAME.to_string();
         let index_name = Some(Self::Index::INDEX_NAME.to_string());
-        let input = self
-            .query_condition()?
-            .build(table_name, index_name);
+        let input = self.query_condition()?.build(table_name, index_name);
 
         let output = client.query(input).await?;
 
@@ -115,14 +122,14 @@ impl Condition {
                     .map(|(i, value)| (format!(":{}", i), value))
                     .collect(),
             ),
-            ..Default::default()
+            ..QueryInput::default()
         }
     }
 }
 
 pub enum Query {
     Equal(String, AttributeValue),
-    And(Box<Query>, Box<Query>),
+    // And(Box<Query>, Box<Query>),
 }
 
 impl From<Query> for Condition {
@@ -154,13 +161,12 @@ impl Query {
                 values.push(value);
 
                 format!("#{} = :{}", i, j)
-            }
-            Query::And(lhs, rhs) => {
-                let lhs = lhs.__enrich(names, values);
-                let rhs = rhs.__enrich(names, values);
+            } // Query::And(lhs, rhs) => {
+              //     let lhs = lhs.__enrich(names, values);
+              //     let rhs = rhs.__enrich(names, values);
 
-                format!("({}) AND ({})", lhs, rhs)
-            }
+              //     format!("({}) AND ({})", lhs, rhs)
+              // }
         }
     }
 }

@@ -5,10 +5,16 @@ use uuid::Uuid;
 #[template(path = "home.html")]
 pub struct Home {
     pub tokens: Vec<HomeToken>,
+    pub providers: Vec<Provider>,
 }
 
 pub struct HomeToken {
     pub id: Uuid,
+    pub name: String,
+}
+
+pub struct Provider {
+    pub slug: String,
     pub name: String,
 }
 

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Spotify Oauth Proxy</title>
+    <title>Oauth2 Proxy</title>
   </head>
   <body>
     <ul>
@@ -9,6 +9,8 @@
         <li><a href="/token/{{ token.id }}">View token {{ token.name }}</a></li>
       {% endfor %}
     </ul>
-    <a href="/token/spotify">Create a new spotify token</a>
+    {% for provider in providers %}
+      <a href="/token/{{ provider.slug }}">Create a new {{ provider.name }} token</a>
+    {% endfor %}
   </body>
 </html>
