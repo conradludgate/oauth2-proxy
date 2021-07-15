@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use dynomite::dynamodb::{GetItemError, QueryError};
 use rocket::{
-    http::{Cookie, CookieJar, Status},
+    http::Status,
     request::{FromParam, FromRequest, Outcome, Request},
     response::Responder,
     Route,
@@ -18,7 +18,7 @@ use crate::{
 };
 
 pub fn routes() -> Vec<Route> {
-    routes![home, session, view_token, new_token]
+    routes![home, view_token, new_token]
 }
 
 struct UserID(String);
@@ -79,14 +79,6 @@ async fn home(user_id: UserID) -> Result<templates::Home, DynamoError<QueryError
             name: "Spotify".to_owned(),
         }],
     })
-}
-
-#[get("/session")]
-fn session(cookies: &CookieJar<'_>) {
-    cookies.add_private(Cookie::new(
-        "session",
-        "072fd190-745f-4824-a69b-c71200f2271c",
-    ));
 }
 
 #[get("/token/<token_id>")]

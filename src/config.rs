@@ -1,7 +1,4 @@
 use serde::Deserialize;
-use std::error::Error;
-use std::fs::File;
-use std::io::Read;
 
 fn base_url() -> String {
     "http://localhost:27228".to_owned()
@@ -18,12 +15,4 @@ pub struct Config {
 pub struct Client {
     pub client_id: String,
     pub client_secret: String,
-}
-
-pub fn parse() -> Result<Config, Box<dyn Error>> {
-    let mut file = File::open("oauth2.toml")?;
-    let mut s = String::new();
-    file.read_to_string(&mut s)?;
-
-    Ok(toml::from_str(&s)?)
 }
