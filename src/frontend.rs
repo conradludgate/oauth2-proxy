@@ -4,13 +4,12 @@ use dynomite::dynamodb::{GetItemError, QueryError};
 use rocket::{
     http::Status,
     request::{FromParam, FromRequest, Outcome, Request},
-    response::Responder,
-    Route,
+    Route, State,
 };
 use uuid::Uuid;
 
 use crate::{
-    db::{self, DynamoError, TokenKey, TokenUserIndex, TokenUserIndexKey, UserSessionKey},
+    db::{Client, DynamoError, TokenKey, TokenUserIndex, TokenUserIndexKey, UserSessionKey},
     templates,
 };
 
@@ -34,7 +33,8 @@ impl<'r> FromRequest<'r> for UserID {
             Err(_) => return Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
         };
 
-        let user_session = db::get(UserSessionKey { session_id }).await;
+        let db: &Client = request.rocket().state().unwrap();
+        let user_session = db.get(UserSessionKey { session_id }).await;
         match user_session {
             Ok(Some(user_session)) => Outcome::Success(Self(user_session.user_id)),
             Ok(None) | Err(_) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
@@ -52,16 +52,12 @@ impl<'a> FromParam<'a> for TokenID {
     }
 }
 
-impl<'r, 'o: 'r, E: std::error::Error + 'static> Responder<'r, 'o> for DynamoError<E> {
-    fn respond_to(self, _: &'r Request<'_>) -> rocket::response::Result<'o> {
-        error!("{}", self);
-        Err(Status::InternalServerError)
-    }
-}
-
 #[get("/")]
-async fn home(user_id: UserID) -> Result<templates::Home, DynamoError<QueryError>> {
-    let tokens: Vec<TokenUserIndex> = db::query(TokenUserIndexKey { user_id: user_id.0 }).await?;
+async fn home(
+    db: &State<Client>,
+    user_id: UserID,
+) -> Result<templates::Home, DynamoError<QueryError>> {
+    let tokens: Vec<TokenUserIndex> = db.query(TokenUserIndexKey { user_id: user_id.0 }).await?;
 
     Ok(templates::Home {
         tokens: tokens
@@ -80,13 +76,15 @@ async fn home(user_id: UserID) -> Result<templates::Home, DynamoError<QueryError
 
 #[get("/token/<token_id>")]
 async fn view_token(
+    db: &State<Client>,
     token_id: TokenID,
     user_id: UserID,
 ) -> Result<Option<templates::ViewToken>, DynamoError<GetItemError>> {
-    let token = db::get(TokenKey {
-        token_id: token_id.0,
-    })
-    .await?;
+    let token = db
+        .get(TokenKey {
+            token_id: token_id.0,
+        })
+        .await?;
     let token = match token {
         Some(token) => token,
         None => return Ok(None),

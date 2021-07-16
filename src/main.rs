@@ -25,6 +25,7 @@ fn rocket() -> _ {
 
     rocket::custom(figment)
         .attach(AdHoc::config::<Config>())
+        .manage(db::Client::default())
         .mount("/", frontend::routes())
         .mount("/api", api::routes())
 }

@@ -1,5 +1,5 @@
 mod helpers;
-pub use helpers::{get, query, save, DynamoError};
+pub use helpers::{Client, DynamoError};
 use helpers::{DynamoIndex, DynamoPrimaryKey, DynamoSecondaryKey, DynamoTable, Query};
 
 use dynomite::{Attribute, Attributes, Item};

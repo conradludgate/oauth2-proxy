@@ -1,6 +1,6 @@
 use crate::{
     config::Config,
-    db::{self, DynamoError, UserSession},
+    db::{Client, DynamoError, UserSession},
     templates,
 };
 use dynomite::dynamodb::PutItemError;
@@ -98,6 +98,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for CallbackError {
 #[get("/callback/spotify?<code>&<state>")]
 async fn callback(
     config: &State<Config>,
+    db: &State<Client>,
     cookies: &CookieJar<'_>,
     code: &str,
     state: &str,
@@ -159,10 +160,11 @@ async fn callback(
 
     cookies.add_private(Cookie::new("session", session_id.to_string()));
 
-    db::save(UserSession {
+    db.save(UserSession {
         user_id: me.id,
         session_id,
-    }).await?;
+    })
+    .await?;
 
     Ok(templates::Redirect {
         text: "Click here to finish logging in".to_owned(),
