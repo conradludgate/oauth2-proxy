@@ -9,7 +9,6 @@ mod api;
 mod config;
 mod db;
 mod frontend;
-mod signing;
 mod templates;
 
 #[macro_use]

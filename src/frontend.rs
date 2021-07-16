@@ -10,10 +10,7 @@ use rocket::{
 use uuid::Uuid;
 
 use crate::{
-    db::{
-        DynamoError, DynamoPrimaryKey, DynamoSecondaryKey, TokenKey, TokenUserIndex,
-        TokenUserIndexKey, UserSessionKey,
-    },
+    db::{self, DynamoError, TokenKey, TokenUserIndex, TokenUserIndexKey, UserSessionKey},
     templates,
 };
 
@@ -37,7 +34,7 @@ impl<'r> FromRequest<'r> for UserID {
             Err(_) => return Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
         };
 
-        let user_session = UserSessionKey { session_id }.get().await;
+        let user_session = db::get(UserSessionKey { session_id }).await;
         match user_session {
             Ok(Some(user_session)) => Outcome::Success(Self(user_session.user_id)),
             Ok(None) | Err(_) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
@@ -64,7 +61,7 @@ impl<'r, 'o: 'r, E: std::error::Error + 'static> Responder<'r, 'o> for DynamoErr
 
 #[get("/")]
 async fn home(user_id: UserID) -> Result<templates::Home, DynamoError<QueryError>> {
-    let tokens: Vec<TokenUserIndex> = TokenUserIndexKey { user_id: user_id.0 }.query().await?;
+    let tokens: Vec<TokenUserIndex> = db::query(TokenUserIndexKey { user_id: user_id.0 }).await?;
 
     Ok(templates::Home {
         tokens: tokens
@@ -86,10 +83,9 @@ async fn view_token(
     token_id: TokenID,
     user_id: UserID,
 ) -> Result<Option<templates::ViewToken>, DynamoError<GetItemError>> {
-    let token = TokenKey {
+    let token = db::get(TokenKey {
         token_id: token_id.0,
-    }
-    .get()
+    })
     .await?;
     let token = match token {
         Some(token) => token,

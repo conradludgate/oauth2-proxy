@@ -1,6 +1,6 @@
 mod helpers;
-pub use helpers::{DynamoError, DynamoPrimaryKey, DynamoSecondaryKey, DynamoTable};
-use helpers::{DynamoIndex, Query};
+pub use helpers::{get, query, save, DynamoError};
+use helpers::{DynamoIndex, DynamoPrimaryKey, DynamoSecondaryKey, DynamoTable, Query};
 
 use dynomite::{Attribute, Attributes, Item};
 use serde::{Deserialize, Serialize};
