@@ -1,6 +1,9 @@
+use std::error::Error;
 use std::str::FromStr;
 
-use dynomite::dynamodb::{GetItemError, QueryError};
+use askama_rocket::Responder;
+use nitroglycerin::dynamodb::DynamoDbClient;
+use nitroglycerin::DynamoDb;
 use rocket::{
     http::Status,
     request::{FromParam, FromRequest, Outcome, Request},
@@ -8,16 +11,40 @@ use rocket::{
 };
 use uuid::Uuid;
 
-use crate::{
-    db::{Client, DynamoError, TokenKey, TokenUserIndex, TokenUserIndexKey, UserSessionKey},
-    templates,
-};
+use crate::db::{Token, UserSession};
+use crate::{db::TokenUserIndex, templates};
 
 pub fn routes() -> Vec<Route> {
     routes![home, view_token, new_token]
 }
 
+#[derive(Debug)]
+pub struct InternalServerError(Box<dyn Error>);
+
+impl<E: Error + 'static> From<E> for InternalServerError {
+    fn from(e: E) -> Self {
+        Self(Box::new(e))
+    }
+}
+impl std::fmt::Display for InternalServerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<'r, 'o: 'r> Responder<'r, 'o> for InternalServerError {
+    fn respond_to(self, _: &'r Request<'_>) -> rocket::response::Result<'o> {
+        error!("{}", self);
+        Err(Status::InternalServerError)
+    }
+}
+
 struct UserID(String);
+impl From<UserID> for String {
+    fn from(u: UserID) -> Self {
+        u.0
+    }
+}
 #[async_trait]
 impl<'r> FromRequest<'r> for UserID {
     type Error = &'static str;
@@ -28,13 +55,17 @@ impl<'r> FromRequest<'r> for UserID {
             None => return Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
         };
 
-        let session_id = match session_id.value().to_string().parse() {
+        let session_id: Uuid = match session_id.value().to_string().parse() {
             Ok(session_id) => session_id,
             Err(_) => return Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
         };
 
-        let db: &Client = request.rocket().state().unwrap();
-        let user_session = db.get(UserSessionKey { session_id }).await;
+        let db: &DynamoDbClient = request.rocket().state().unwrap();
+        let user_session = db
+            .get::<UserSession>()
+            .session_id(session_id)
+            .execute()
+            .await;
         match user_session {
             Ok(Some(user_session)) => Outcome::Success(Self(user_session.user_id)),
             Ok(None) | Err(_) => Outcome::Failure((Status::Unauthorized, "invalid session cookie")),
@@ -43,6 +74,11 @@ impl<'r> FromRequest<'r> for UserID {
 }
 
 struct TokenID(Uuid);
+impl From<TokenID> for Uuid {
+    fn from(u: TokenID) -> Self {
+        u.0
+    }
+}
 #[async_trait]
 impl<'a> FromParam<'a> for TokenID {
     type Error = <Uuid as FromStr>::Err;
@@ -54,10 +90,14 @@ impl<'a> FromParam<'a> for TokenID {
 
 #[get("/")]
 async fn home(
-    db: &State<Client>,
+    db: &State<DynamoDbClient>,
     user_id: UserID,
-) -> Result<templates::Home, DynamoError<QueryError>> {
-    let tokens: Vec<TokenUserIndex> = db.query(TokenUserIndexKey { user_id: user_id.0 }).await?;
+) -> Result<templates::Home, InternalServerError> {
+    let tokens = db
+        .query::<TokenUserIndex>()
+        .user_id(user_id)
+        .execute()
+        .await?;
 
     Ok(templates::Home {
         tokens: tokens
@@ -76,15 +116,11 @@ async fn home(
 
 #[get("/token/<token_id>")]
 async fn view_token(
-    db: &State<Client>,
+    db: &State<DynamoDbClient>,
     token_id: TokenID,
     user_id: UserID,
-) -> Result<Option<templates::ViewToken>, DynamoError<GetItemError>> {
-    let token = db
-        .get(TokenKey {
-            token_id: token_id.0,
-        })
-        .await?;
+) -> Result<Option<templates::ViewToken>, InternalServerError> {
+    let token = db.get::<Token>().token_id(token_id).execute().await?;
     let token = match token {
         Some(token) => token,
         None => return Ok(None),

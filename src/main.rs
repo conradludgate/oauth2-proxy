@@ -3,7 +3,9 @@
 #![warn(clippy::nursery)]
 
 use config::Config;
+use nitroglycerin::dynamodb::DynamoDbClient;
 use rocket::fairing::AdHoc;
+use rusoto_core::Region;
 
 mod api;
 mod config;
@@ -25,7 +27,7 @@ fn rocket() -> _ {
 
     rocket::custom(figment)
         .attach(AdHoc::config::<Config>())
-        .manage(db::Client::default())
+        .manage(DynamoDbClient::new(Region::default()))
         .mount("/", frontend::routes())
         .mount("/api", api::routes())
 }

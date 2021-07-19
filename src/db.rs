@@ -1,21 +1,17 @@
-mod helpers;
-pub use helpers::{Client, DynamoError};
-use helpers::{DynamoIndex, DynamoPrimaryKey, DynamoSecondaryKey, DynamoTable, Query};
-
-use dynomite::{Attribute, Attributes, Item};
+use nitroglycerin::{Attributes, Get, Query, Table, TableIndex};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Item)]
+#[derive(Attributes, Get)]
 pub struct UserSession {
-    #[dynomite(partition_key)]
+    #[nitro(partition_key)]
     pub session_id: Uuid,
     pub user_id: String,
 }
 
-#[derive(Item)]
+#[derive(Attributes, Get)]
 pub struct Token {
-    #[dynomite(partition_key)]
+    #[nitro(partition_key)]
     pub token_id: Uuid,
     pub user_id: String,
     pub name: String,
@@ -33,41 +29,30 @@ pub struct OauthToken {
     pub scopes: Vec<String>,
 }
 
-#[derive(Item)]
+#[derive(Attributes, Query)]
 pub struct TokenUserIndex {
-    #[dynomite(partition_key)]
+    #[nitro(partition_key)]
     pub user_id: String,
 
     pub token_id: Uuid,
     pub name: String,
 }
 
-impl DynamoTable for UserSession {
-    const TABLE_NAME: &'static str = "UserSessions";
+impl Table for UserSession {
+    fn table_name() -> String {
+        "UserSessions".to_string()
+    }
 }
 
-impl DynamoPrimaryKey for UserSessionKey {
-    type Table = UserSession;
+impl Table for Token {
+    fn table_name() -> String {
+        "Tokens".to_string()
+    }
 }
 
-impl DynamoTable for Token {
-    const TABLE_NAME: &'static str = "Tokens";
-}
-
-impl DynamoPrimaryKey for TokenKey {
+impl TableIndex for TokenUserIndex {
     type Table = Token;
-}
-
-impl DynamoIndex for TokenUserIndex {
-    type Table = Token;
-    const INDEX_NAME: &'static str = "TokenUserIndex";
-}
-
-impl DynamoSecondaryKey for TokenUserIndexKey {
-    type Index = TokenUserIndex;
-    fn query_condition(self) -> Result<Query, dynomite::AttributeError> {
-        let key = "user_id".to_string();
-        let value = self.user_id.into_attr();
-        Ok(Query::Equal(key, value))
+    fn index_name() -> Option<String> {
+        Some("TokenUserIndex".to_string())
     }
 }

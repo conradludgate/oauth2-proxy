@@ -1,9 +1,8 @@
-use crate::{
-    config::Config,
-    db::{Client, DynamoError, UserSession},
-    templates,
+use crate::{config::Config, db::UserSession, templates};
+use nitroglycerin::{
+    dynamodb::{DynamoDbClient, PutItemError},
+    DynamoDb, DynamoError,
 };
-use dynomite::dynamodb::PutItemError;
 use rocket::{
     http::{uri::Absolute, Cookie, CookieJar, SameSite, Status},
     request::Request,
@@ -79,9 +78,12 @@ enum CallbackError {
 }
 
 impl<'r, 'o: 'r> Responder<'r, 'o> for CallbackError {
-    fn respond_to(self, r: &'r Request<'_>) -> rocket::response::Result<'o> {
+    fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
         match self {
-            CallbackError::Dynamo(d) => d.respond_to(r),
+            CallbackError::Dynamo(d) => {
+                error!("{}", d);
+                Err(Status::InternalServerError)
+            }
             CallbackError::Reqwest(e) => {
                 error!("{}", e);
                 Err(Status::InternalServerError)
@@ -98,7 +100,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for CallbackError {
 #[get("/callback/spotify?<code>&<state>")]
 async fn callback(
     config: &State<Config>,
-    db: &State<Client>,
+    db: &State<DynamoDbClient>,
     cookies: &CookieJar<'_>,
     code: &str,
     state: &str,
@@ -160,10 +162,11 @@ async fn callback(
 
     cookies.add_private(Cookie::new("session", session_id.to_string()));
 
-    db.save(UserSession {
+    db.put(UserSession {
         user_id: me.id,
         session_id,
     })
+    .execute()
     .await?;
 
     Ok(templates::Redirect {
