@@ -1,0 +1,4 @@
+imports_granularity = "Crate"
+overflow_delimited_expr = true
+group_imports = "StdExternalCrate"
+max_width = 200

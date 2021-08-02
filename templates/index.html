@@ -1,9 +1,7 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Spotify Oauth Proxy</title>
-  </head>
-  <body>
-    <a href="/api/login">Login</a>
-  </body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+  <a href="/login">Login</a>
+{% endblock %}

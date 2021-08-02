@@ -25,6 +25,7 @@ pub struct Index;
 #[derive(Template)]
 #[template(path = "new_token.html")]
 pub struct NewToken {
+    pub provider_id: String,
     pub scopes: Vec<String>,
 }
 
@@ -43,3 +44,8 @@ pub struct ViewToken {
     pub scopes: Vec<String>,
     pub api_key: Option<String>,
 }
+
+
+#[derive(Template)]
+#[template(path = "login.html")]
+pub struct Login;

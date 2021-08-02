@@ -1,16 +1,14 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Oauth2 Proxy</title>
-  </head>
-  <body>
-    <ul>
-      {% for token in tokens %}
-        <li><a href="/token/{{ token.id }}">View token {{ token.name }}</a></li>
-      {% endfor %}
-    </ul>
-    {% for provider in providers %}
-      <a href="/token/{{ provider.slug }}">Create a new {{ provider.name }} token</a>
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+  <ul>
+    {% for token in tokens %}
+      <li><a href="/token/{{ token.id }}">View token {{ token.name }}</a></li>
     {% endfor %}
-  </body>
-</html>
+  </ul>
+  {% for provider in providers %}
+    <a href="/token/{{ provider.slug }}">Create a new {{ provider.name }} token</a>
+  {% endfor %}
+{% endblock %}

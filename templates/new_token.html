@@ -1,29 +1,29 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Create a new token | Spotify Oauth Proxy</title>
-  </head>
-  <body>
-    <form action="/token" method="post">
-      <label for="name">Token name:</label><br />
-      <input type="text" id="name" name="name" required /><br />
+{% extends "base.html" %}
 
-      <label>Scopes:</label><br />
-      <ul>
-        {% for scope in scopes %}
-          <li>
-            <input
-              type="checkbox"
-              id="scopes-{{ scope }}"
-              name="scopes"
-              value="{{ scope }}"
-            />
-            <label for="scopes-{{ scope }}">{{ scope }}</label>
-          </li>
-        {% endfor %}
-      </ul>
+{% block title %}Create a new token{% endblock %}
 
-      <input type="submit" value="Submit" />
-    </form>
-  </body>
-</html>
+{% block content %}
+  <form action="/token" method="post">
+    <label for="name">Token name:</label><br />
+    <input type="text" id="name" name="name" required /><br />
+
+    <input type="hidden" id="provider_id" name="provider_id" value="{{ provider_id }}"><br />
+
+    <label>Scopes:</label><br />
+    <ul>
+      {% for scope in scopes %}
+        <li>
+          <input
+            type="checkbox"
+            id="scopes-{{ scope }}"
+            name="scopes"
+            value="{{ scope }}"
+          />
+          <label for="scopes-{{ scope }}">{{ scope }}</label>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <input type="submit" value="Submit" />
+  </form>
+{% endblock %}

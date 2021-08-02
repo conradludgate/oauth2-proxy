@@ -7,27 +7,25 @@ use nitroglycerin::dynamodb::DynamoDbClient;
 use rocket::fairing::AdHoc;
 use rusoto_core::Region;
 
-mod api;
 mod config;
 mod db;
-mod frontend;
+mod login;
+mod routes;
 mod templates;
+mod token;
+mod util;
 
 #[macro_use]
 extern crate rocket;
 
 #[launch]
 fn rocket() -> _ {
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|s| s.parse::<u16>().ok())
-        .unwrap_or(27228);
+    let port = std::env::var("PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(27228);
 
     let figment = rocket::Config::figment().merge(("port", port));
 
     rocket::custom(figment)
         .attach(AdHoc::config::<Config>())
         .manage(DynamoDbClient::new(Region::default()))
-        .mount("/", frontend::routes())
-        .mount("/api", api::routes())
+        .mount("/", routes::routes())
 }
