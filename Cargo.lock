@@ -930,23 +930,25 @@ dependencies = [
 
 [[package]]
 name = "nitroglycerin"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f30178ed50f030cf57c8bd060b5874d7b25157560834f90287ae9b19bd29051"
+checksum = "d9e260b72588fbe4ed28440d3c089c2c7463006c80510dbb07c19c1a61d0e4d5"
 dependencies = [
  "chrono",
  "nitroglycerin_derive",
+ "oauth2",
  "rusoto_core",
  "rusoto_dynamodb",
+ "serde_json",
  "thiserror",
  "uuid",
 ]
 
 [[package]]
 name = "nitroglycerin_derive"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f989a8f3c6d515e5e440e1afd700186bfdb54b7d5312d19d50c891acbed97a5"
+checksum = "557cab17d32a708c1f51fa0a96e04cf1ae078e0d6e43e7fb686486da0eccc58e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1422,6 +1424,7 @@ dependencies = [
  "rocket_codegen",
  "rocket_http",
  "serde",
+ "serde_json",
  "state",
  "tempfile",
  "time 0.2.27",

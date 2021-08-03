@@ -17,13 +17,13 @@ oauth2 = "4.1.0"
 
 thiserror = "1.0"
 
-rocket = { version = "0.5.0-rc.1" }
+rocket = { version = "0.5.0-rc.1", features = ["json"] }
 
 askama = { git = "https://github.com/djc/askama" }
 askama_rocket = { git = "https://github.com/djc/askama" }
 
 rusoto_core = "0.47.0"
-nitroglycerin = { version = "0.4.2", features = ["uuid", "chrono"] }
+nitroglycerin = { version = "0.4.3", features = ["uuid", "chrono", "oauth2"] }
 
 uuid = { version = "0.8", features = ["v4"] }
 chrono = "0.4"

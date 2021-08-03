@@ -1,5 +1,5 @@
 use nitroglycerin::{Attributes, Key, Query, Table, TableIndex};
-use serde::{Deserialize, Serialize};
+use oauth2::{basic::BasicTokenType, AccessToken, RefreshToken};
 use uuid::Uuid;
 
 #[derive(Attributes, Key)]
@@ -9,7 +9,7 @@ pub struct User {
     pub password_hash: String,
 }
 
-#[derive(Attributes, Key)]
+#[derive(Clone, Attributes, Key)]
 pub struct Token {
     #[nitro(partition_key)]
     pub token_id: Uuid,
@@ -18,16 +18,14 @@ pub struct Token {
     pub name: String,
     pub provider_id: String,
     pub scopes: Vec<String>,
-    pub oauth: Option<OauthToken>,
-}
 
-#[derive(Serialize, Deserialize, Attributes, Debug)]
-pub struct OauthToken {
-    pub access_token: String,
-    pub refresh_token: Option<String>,
-    pub expires: Option<chrono::DateTime<chrono::Utc>>,
-    pub token_type: String,
     pub key_hash: String,
+
+    pub access_token: AccessToken,
+    pub refresh_token: RefreshToken,
+    pub token_type: BasicTokenType,
+    #[nitro(with = nitroglycerin::convert::chrono::seconds)]
+    pub expires: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Attributes, Query)]

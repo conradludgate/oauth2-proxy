@@ -14,44 +14,31 @@ use rocket::{
     State,
 };
 use thiserror::Error;
-use uuid::Uuid;
 
-use crate::{config::Config, db::Token, login, templates, token, util::bail};
+use crate::{config::Config, db::Token, login, routes::callback::random_key, templates, token, util::bail};
 
 #[post("/token", data = "<token_data>")]
-pub async fn create(db: &State<DynamoDbClient>, config: &State<Config>, login_claims: login::Claims, token_data: Form<token::Data>) -> Result<Redirect, CreateError> {
+pub async fn create(config: &State<Config>, login_claims: login::Claims, token_data: Form<token::Data>) -> Result<Redirect, CreateError> {
     let token::Data { name, provider_id, scopes } = token_data.into_inner();
 
-    let token_id = Uuid::new_v4();
     let claims = token::Claims {
-        token_id: token_id.to_string(),
+        name,
         provider_id,
-        scopes,
+        scopes: scopes,
         username: login_claims.username,
         expires: Utc::now() + Duration::minutes(10),
     };
     let state = encode(&Header::default(), &claims, &EncodingKey::from_base64_secret(&config.state_key)?)?;
-    let token::Claims { provider_id, scopes, username, .. } = claims;
+    let token::Claims { provider_id, scopes, .. } = claims;
 
     let (url, _) = config
         .providers
         .get(&provider_id)
         .ok_or_else(|| CreateError::MissingProvider(provider_id.clone()))?
-        .oauth2_client(config)
+        .oauth2_client(config.base_url.clone())
         .authorize_url(|| CsrfToken::new(state))
-        .add_scopes(scopes.clone().into_iter().map(Scope::new))
+        .add_scopes(scopes.into_iter().map(Scope::new))
         .url();
-
-    db.put(Token {
-        token_id,
-        username,
-        name,
-        provider_id,
-        scopes,
-        oauth: None,
-    })
-    .execute()
-    .await?;
 
     Ok(Redirect::to(Reference::parse_owned(url.to_string()).unwrap()))
 }
@@ -120,6 +107,42 @@ pub enum DeleteError {
     DynamoDelete(#[from] DynamoError<DeleteItemError>),
 }
 impl<'r, 'o: 'r> Responder<'r, 'o> for DeleteError {
+    fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
+        bail(self, Status::InternalServerError)
+    }
+}
+
+#[post("/token/<token_id>/revoke")]
+pub async fn revoke(db: &State<DynamoDbClient>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, RevokeError> {
+    let mut token = match db.get::<Token>().token_id(token_id).username(login_claims.username).execute().await? {
+        Some(token) => token,
+        None => return Ok(None),
+    };
+
+    let api_key = random_key();
+    let api_key = base64::encode_config(api_key, base64::URL_SAFE);
+
+    token.key_hash = bcrypt::hash(&api_key, 12)?;
+    db.put(token.clone()).execute().await?;
+
+    Ok(Some(templates::ViewToken {
+        name: token.name,
+        id: token.token_id,
+        scopes: token.scopes,
+        api_key: Some(api_key),
+    }))
+}
+
+#[derive(Debug, Error)]
+pub enum RevokeError {
+    #[error("error making db request {0}")]
+    DynamoGet(#[from] DynamoError<GetItemError>),
+    #[error("error making db request {0}")]
+    DynamoPut(#[from] DynamoError<PutItemError>),
+    #[error("error creating hash {0}")]
+    Bcrypt(#[from] bcrypt::BcryptError),
+}
+impl<'r, 'o: 'r> Responder<'r, 'o> for RevokeError {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
         bail(self, Status::InternalServerError)
     }

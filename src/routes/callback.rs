@@ -5,58 +5,49 @@ use nitroglycerin::{
     dynamodb::{DynamoDbClient, PutItemError},
     DynamoDb, DynamoError,
 };
-use oauth2::{reqwest::async_http_client, AuthorizationCode, TokenResponse};
+use oauth2::{reqwest::async_http_client, AuthorizationCode};
 use rocket::{http::Status, request::Request, State};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::{
-    config::Config,
-    db::{OauthToken, Token},
-    templates, token,
-    util::bail,
-};
+use crate::{config::Config, db::Token, templates, token, util::bail};
 
 #[get("/callback?<code>&<state>")]
 pub async fn callback(config: &State<Config>, db: &State<DynamoDbClient>, code: String, state: &str) -> Result<templates::ViewToken, HandlerError> {
     let token_data = decode(state, &DecodingKey::from_base64_secret(&config.state_key)?, &Validation::default())?;
     let token::Claims {
-        token_id,
-        provider_id,
-        scopes,
-        username,
-        ..
+        name, provider_id, scopes, username, ..
     } = token_data.claims;
-    let token_id = token_id.parse::<Uuid>()?;
-
-    let mut token = db
-        .get::<Token>()
-        .token_id(token_id)
-        .username(username)
-        .execute()
-        .await
-        .ok()
-        .flatten()
-        .ok_or(HandlerError::Status(Status::BadRequest))?;
 
     let provider = config.providers.get(&provider_id).ok_or(HandlerError::Status(Status::InternalServerError))?;
-    let t = provider.oauth2_client(config).exchange_code(AuthorizationCode::new(code)).request_async(async_http_client).await?;
+    let token = provider
+        .oauth2_client(config.base_url.clone())
+        .exchange_code(AuthorizationCode::new(code))
+        .request_async(async_http_client)
+        .await?;
 
     let api_key = random_key();
     let api_key = base64::encode_config(api_key, base64::URL_SAFE);
 
-    token.oauth = Some(OauthToken {
-        access_token: t.access_token().secret().clone(),
-        refresh_token: t.refresh_token().map(|rt| rt.secret().clone()),
-        expires: t.expires_in().map(|exp| Utc::now() + Duration::seconds(exp.as_secs() as i64)),
-        token_type: t.token_type().as_ref().to_owned(),
+    let token = Token {
+        token_id: Uuid::new_v4(),
+        username,
+        name,
+        provider_id,
+        scopes,
+
         key_hash: bcrypt::hash(&api_key, 12)?,
-    });
+
+        access_token: token.access_token,
+        refresh_token: token.refresh_token.ok_or(HandlerError::Status(Status::InternalServerError))?,
+        token_type: token.token_type,
+        expires: Utc::now() + Duration::seconds(token.expires_in as i64),
+    };
 
     let template = templates::ViewToken {
         name: token.name.clone(),
-        id: token.token_id,
-        scopes,
+        id: token.token_id.clone(),
+        scopes: token.scopes.clone(),
         api_key: Some(api_key),
     };
 
@@ -65,7 +56,7 @@ pub async fn callback(config: &State<Config>, db: &State<DynamoDbClient>, code: 
     Ok(template)
 }
 
-fn random_key() -> [u8; 48] {
+pub fn random_key() -> [u8; 48] {
     use rand::Rng;
 
     let mut rng = rand::thread_rng();
