@@ -2,7 +2,7 @@ use askama_rocket::Responder;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use nitroglycerin::{
-    dynamodb::{DynamoDbClient, GetItemError, PutItemError},
+    dynamodb::{DynamoDbClient, GetItemError},
     DynamoDb, DynamoError,
 };
 use rocket::{
