@@ -1,3 +1,6 @@
 /target
 Rocket.toml
 .vscode/
+
+*.tfstate*
+.terraform*

@@ -20,10 +20,10 @@ jobs:
           - x86_64-pc-windows-msvc # 64-bit MSVC (Windows 7+)
     steps:
       - uses: actions/checkout@v2
-      
+
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           target: ${{ matrix.target }}
           override: true
 

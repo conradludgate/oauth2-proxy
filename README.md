@@ -46,7 +46,21 @@ When the token has expired, simply call the endpoint again to get a new access t
 
 > WIP. This documentation needs some work
 
-Configure a `Rocket.toml` file similar to the following
+This project makes use of dynamodb to store data (The free tier is very permissive).
+
+Create a `.env` file will your aws credentials
+
+```
+AWS_ACCESS_KEY_ID="..."
+AWS_SECRET_ACCESS_KEY="..."
+AWS_DEFAULT_REGION="..."
+```
+
+And configure your DynamoDB tables according to https://github.com/conradludgate/oauth2-proxy/blob/main/terraform/main.tf
+
+> If you want to self host DynamoDB, check out https://localstack.cloud/
+
+Configure a `Rocket.toml` file similar to the following (adding the oauth2 providers you need)
 
 ```toml
 [default]
@@ -93,20 +107,12 @@ auth_url = "https://accounts.google.com/o/oauth2/v2/auth"
 token_url = "https://oauth2.googleapis.com/token"
 
 scopes = [
-    ...
+    "...",
 ]
 ```
 
-And `.env` file
+Then start the docker container
 
 ```
-AWS_ACCESS_KEY_ID="..."
-AWS_SECRET_ACCESS_KEY="..."
-AWS_DEFAULT_REGION="..."
-```
-
-Then run the docker image
-
-```
-docker run -v `pwd`/Rocket.toml:/app/Rocket.toml --env-file .env -p 27228:27228 ghcr.io/conradludgate/oauth2-proxy:main
+docker run -v `pwd`/Rocket.toml:/app/Rocket.toml --env-file .env -p 27228:27228 ghcr.io/conradludgate/oauth2-proxy:latest
 ```
