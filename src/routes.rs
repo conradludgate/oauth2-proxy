@@ -4,6 +4,7 @@ mod api;
 mod callback;
 mod home;
 mod login;
+mod register;
 mod token;
 
 pub fn routes() -> Vec<Route> {
@@ -15,6 +16,8 @@ pub fn routes() -> Vec<Route> {
         login::page,
         home::page,
         home::index,
+        register::page,
+        register::post,
         token::view,
         token::new,
         token::create,
