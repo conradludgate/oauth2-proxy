@@ -1,0 +1,47 @@
+name: Build release artifact
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  build:
+    name: Build, push, and deploy
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu	# ARM64 Linux (kernel 4.2, glibc 2.17+) 1
+          - x86_64-unknown-linux-gnu # 64-bit Linux (kernel 2.6.32+, glibc 2.11+)
+          - aarch64-apple-darwin # ARM64 macOS (11.0+, Big Sur+)
+          - x86_64-apple-darwin	# 64-bit macOS (10.7+, Lion+)
+          - x86_64-pc-windows-msvc # 64-bit MSVC (Windows 7+)
+    steps:
+      - uses: actions/checkout@v2
+      
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --target ${{ matrix.target }} --out-dir /artifacts -Z unstable-options
+
+      - name: Archive Release
+        uses: thedoctor0/zip-release@0.6.0
+        with:
+          type: 'tar'
+          filename: 'oauth2-proxy-${{ matrix.target }}.tar.gz'
+          directory: /artifacts
+
+      - uses: skx/github-action-publish-binaries@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: '/artifacts/oauth2-proxy-${{ matrix.target }}.tar.gz'
