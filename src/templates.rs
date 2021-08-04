@@ -30,13 +30,6 @@ pub struct NewToken {
 }
 
 #[derive(Template)]
-#[template(path = "redirect.html")]
-pub struct Redirect {
-    pub path: String,
-    pub text: String,
-}
-
-#[derive(Template)]
 #[template(path = "token.html")]
 pub struct ViewToken {
     pub name: String,
@@ -45,7 +38,10 @@ pub struct ViewToken {
     pub api_key: Option<String>,
 }
 
-
 #[derive(Template)]
 #[template(path = "login.html")]
 pub struct Login;
+
+#[derive(Template)]
+#[template(path = "register.html")]
+pub struct Register;

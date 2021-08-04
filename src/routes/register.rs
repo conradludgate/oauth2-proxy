@@ -2,7 +2,7 @@ use askama_rocket::Responder;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use nitroglycerin::{
-    dynamodb::{DynamoDbClient, GetItemError},
+    dynamodb::{DynamoDbClient, GetItemError, PutItemError},
     DynamoDb, DynamoError,
 };
 use rocket::{
@@ -16,17 +16,20 @@ use thiserror::Error;
 
 use crate::{config::Config, db::User, login, templates, util::bail};
 
-#[post("/login", data = "<login_data>")]
+#[post("/register", data = "<login_data>")]
 pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &CookieJar<'_>, login_data: Form<Data>) -> Result<Redirect, Error> {
     let Data { username, password } = login_data.into_inner();
     let user = db.get::<User>().username(&username).execute().await?;
     match user {
-        None => return Err(Error::IncorrectPassword),
-        Some(user) => {
-            if !bcrypt::verify(password, &user.password_hash)? {
-                return Err(Error::IncorrectPassword);
-            }
+        None => {
+            db.put(User {
+                username: username.clone(),
+                password_hash: bcrypt::hash(password, config.bcrypt_cost)?,
+            })
+            .execute()
+            .await?;
         }
+        Some(_) => return Err(Error::UserExists),
     };
 
     let claims = login::Claims {
@@ -39,9 +42,9 @@ pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &
     Ok(Redirect::to(uri!(crate::routes::home::page)))
 }
 
-#[get("/login")]
-pub const fn page() -> templates::Login {
-    templates::Login
+#[get("/register")]
+pub const fn page() -> templates::Register {
+    templates::Register
 }
 
 #[derive(FromForm)]
@@ -54,18 +57,20 @@ pub struct Data {
 pub enum Error {
     #[error("error making db request {0}")]
     DynamoGet(#[from] DynamoError<GetItemError>),
+    #[error("error making db request {0}")]
+    DynamoPut(#[from] DynamoError<PutItemError>),
     #[error("error decoding json {0}")]
     Bcrypt(#[from] bcrypt::BcryptError),
     #[error("error encoding jwt {0}")]
     Jwt(#[from] jsonwebtoken::errors::Error),
-    #[error("invalid password")]
-    IncorrectPassword,
+    #[error("user exists")]
+    UserExists,
 }
 
 impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
         match self {
-            Self::Bcrypt(bcrypt::BcryptError::InvalidPassword) | Self::IncorrectPassword => Err(Status::Unauthorized),
+            Self::Bcrypt(bcrypt::BcryptError::InvalidPassword) | Self::UserExists => Err(Status::BadRequest),
             _ => bail(self, Status::InternalServerError),
         }
     }

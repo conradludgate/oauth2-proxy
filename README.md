@@ -4,8 +4,8 @@ Managed access to oauth2 accounts
 
 ## How it works
 
-1)  Go to https://oauth2.conrad.cafe/login
-2)  Enter a username and password (will create a new account if that username isn't taken)
+1)  Go to https://oauth2.conrad.cafe/register
+2)  Enter a username and password and click register
 3)  Choose the token type you want to create (currently only supports spotify)
 4)  Give the token a name and select the scopes
 5)  Clicking submit will redirect you to the identity provider
