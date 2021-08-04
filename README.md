@@ -4,7 +4,7 @@ Managed access to oauth2 accounts
 
 ## How it works
 
-1)  Go to https://oauth2-proxy.conrad.cafe/login
+1)  Go to https://oauth2.conrad.cafe/login
 2)  Enter a username and password (will create a new account if that username isn't taken)
 3)  Choose the token type you want to create (currently only supports spotify)
 4)  Give the token a name and select the scopes
@@ -14,7 +14,7 @@ Managed access to oauth2 accounts
 And you're all set. Now you can make a request to
 
 ```
-POST https://oauth2-proxy.conrad.cafe/api/v1/token/<token_id>
+POST https://oauth2.conrad.cafe/api/v1/token/<token_id>
 Authorization: Basic <base64 encoded username:api_key>
 ```
 
@@ -27,8 +27,8 @@ And it will respond with your account's access token, token type and expiry time
 For example:
 
 ```
-$ xhs post oauth2-proxy.conrad.cafe/api/v1/token/1b5420b2-6ede-4a8d-88ce-ee82b5a04678 --auth conradludgate
-https: password for conradludgate@oauth2-proxy.conrad.cafe: *********
+$ xhs post oauth2.conrad.cafe/api/v1/token/1b5420b2-6ede-4a8d-88ce-ee82b5a04678 --auth conradludgate
+https: password for conradludgate@oauth2.conrad.cafe: *********
 HTTP/1.1 200 OK
 content-length: 254
 content-type: application/json
@@ -43,6 +43,8 @@ content-type: application/json
 When the token has expired, simply call the endpoint again to get a new access token. The proxy takes care of the refreshing of the token.
 
 ## Self hosting
+
+> WIP. This documentation needs some work
 
 Configure a `Rocket.toml` file similar to the following
 
@@ -93,4 +95,18 @@ token_url = "https://oauth2.googleapis.com/token"
 scopes = [
     ...
 ]
+```
+
+And `.env` file
+
+```
+AWS_ACCESS_KEY_ID="..."
+AWS_SECRET_ACCESS_KEY="..."
+AWS_DEFAULT_REGION="..."
+```
+
+Then run the docker image
+
+```
+docker run -v `pwd`/Rocket.toml:/app/Rocket.toml --env-file .env -p 27228:27228 ghcr.io/conradludgate/oauth2-proxy:main
 ```
