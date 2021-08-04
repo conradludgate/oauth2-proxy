@@ -11,5 +11,6 @@ jobs:
     steps:
       - uses: GoogleCloudPlatform/release-please-action@v2
         with:
+          token: ${{ secrets.GH_PAT }}
           release-type: rust
           package-name: oauth2-proxy
