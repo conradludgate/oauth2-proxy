@@ -1,4 +1,3 @@
-use askama_rocket::Responder;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use nitroglycerin::{
@@ -7,17 +6,17 @@ use nitroglycerin::{
 };
 use rocket::{
     form::Form,
-    http::{Cookie, CookieJar, SameSite, Status},
+    http::{uri::Origin, Cookie, CookieJar, SameSite, Status},
     request::Request,
-    response::Redirect,
+    response::{Redirect, Responder},
     State,
 };
 use thiserror::Error;
 
 use crate::{config::Config, db::User, login, templates, util::bail};
 
-#[post("/login", data = "<login_data>")]
-pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &CookieJar<'_>, login_data: Form<Data>) -> Result<Redirect, Error> {
+#[post("/login?<redirect_to>", data = "<login_data>")]
+pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &CookieJar<'_>, redirect_to: String, login_data: Form<Data>) -> Result<Redirect, Error> {
     let Data { username, password } = login_data.into_inner();
     let user = db.get::<User>().username(&username).execute().await?;
     match user {
@@ -36,12 +35,15 @@ pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &
     let value = encode(&Header::default(), &claims, &EncodingKey::from_base64_secret(&config.state_key)?)?;
     cookies.add(Cookie::build("access_token", value).http_only(true).same_site(SameSite::Strict).secure(true).finish());
 
-    Ok(Redirect::to(uri!(crate::routes::home::page)))
+    let redirect_to = Origin::parse_owned(redirect_to).unwrap_or(uri!(crate::routes::home::page));
+
+    Ok(Redirect::to(redirect_to))
 }
 
-#[get("/login")]
-pub const fn page() -> templates::Login {
-    templates::Login
+#[get("/login?<redirect_to>")]
+pub fn page(redirect_to: Option<String>) -> templates::Login {
+    let redirect_to = redirect_to.unwrap_or_else(|| "/".to_owned());
+    templates::Login { error: None, redirect_to }
 }
 
 #[derive(FromForm)]
@@ -63,10 +65,14 @@ pub enum Error {
 }
 
 impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
-    fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
+    fn respond_to(self, request: &'r Request<'_>) -> rocket::response::Result<'o> {
         match self {
-            Self::Bcrypt(bcrypt::BcryptError::InvalidPassword) | Self::IncorrectPassword => Err(Status::Unauthorized),
-            _ => bail(self, Status::InternalServerError),
+            Self::Bcrypt(bcrypt::BcryptError::InvalidPassword) | Self::IncorrectPassword => templates::Login {
+                error: Some("username or password incorrect".to_owned()),
+                redirect_to: request.query_value("redirect_to").ok_or(Status::BadRequest)?.map_err(|err| bail(err, Status::BadRequest))?,
+            }
+            .respond_to(request),
+            _ => Err(bail(self, Status::InternalServerError)),
         }
     }
 }

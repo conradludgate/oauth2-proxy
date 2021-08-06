@@ -1,11 +1,21 @@
-use std::{str::FromStr, time::Duration};
+use std::{
+    fmt::{self, Write},
+    str::FromStr,
+    time::Duration,
+};
 
 use chrono::Utc;
 use oauth2::{
     basic::{BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse, BasicTokenType},
     AccessToken, AuthUrl, ClientId, ClientSecret, RedirectUrl, RefreshToken, Scope, StandardRevocableToken, TokenResponse, TokenUrl,
 };
-use rocket::request::FromParam;
+use rocket::{
+    http::{
+        impl_from_uri_param_identity,
+        uri::fmt::{Formatter, Part, UriDisplay},
+    },
+    request::FromParam,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -23,6 +33,13 @@ impl<'a> FromParam<'a> for ID {
         param.parse().map(ID)
     }
 }
+
+impl<P: Part> UriDisplay<P> for ID {
+    fn fmt(&self, f: &mut Formatter<'_, P>) -> fmt::Result {
+        f.write_str(&self.0.to_string())
+    }
+}
+impl_from_uri_param_identity!(ID);
 
 #[derive(FromForm)]
 pub struct Data {

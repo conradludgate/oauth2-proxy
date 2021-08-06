@@ -19,6 +19,7 @@ pub fn routes() -> Vec<Route> {
         register::page,
         register::post,
         token::view,
+        token::view_unauthenticated,
         token::new,
         token::create,
         token::delete,

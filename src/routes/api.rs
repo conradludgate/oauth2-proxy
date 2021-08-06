@@ -4,7 +4,7 @@ use nitroglycerin::{
     dynamodb::{DynamoDbClient, GetItemError, PutItemError},
     DynamoDb, DynamoError,
 };
-use oauth2::{AccessToken, basic::BasicTokenType, reqwest::async_http_client};
+use oauth2::{basic::BasicTokenType, reqwest::async_http_client, AccessToken};
 use rocket::{
     http::Status,
     request::{FromRequest, Outcome, Request},
@@ -57,7 +57,7 @@ impl<'r> FromRequest<'r> for Basic {
 #[post("/api/v1/token/<token_id>")]
 pub async fn exchange(db: &State<DynamoDbClient>, config: &State<Config>, token_id: token::ID, auth: Basic) -> Result<Json<ExchangeResponse>, ExchangeError> {
     let Basic { username, password } = auth;
-    let mut token = db.get::<Token>().token_id(token_id).username(username).execute().await?.ok_or(ExchangeError::NotFound)?;
+    let mut token = db.get::<Token>().username(username).token_id(token_id).execute().await?.ok_or(ExchangeError::NotFound)?;
     if !bcrypt::verify(password, &token.key_hash)? {
         return Err(ExchangeError::IncorrectPassword);
     }
@@ -118,7 +118,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for ExchangeError {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
         match self {
             Self::Bcrypt(bcrypt::BcryptError::InvalidPassword) | Self::IncorrectPassword | Self::NotFound => Err(Status::Unauthorized),
-            _ => bail(self, Status::InternalServerError),
+            _ => Err(bail(self, Status::InternalServerError)),
         }
     }
 }

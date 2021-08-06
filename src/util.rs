@@ -1,4 +1,4 @@
-pub fn bail<'o>(err: impl std::error::Error, status: rocket::http::Status) -> rocket::response::Result<'o> {
+pub fn bail<'o>(err: impl std::fmt::Display, status: rocket::http::Status) -> rocket::http::Status {
     error!("{}", err);
-    Err(status)
+    status
 }
