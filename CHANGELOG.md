@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://www.github.com/conradludgate/oauth2-proxy/compare/v0.3.0...v0.4.0) (2021-08-06)
+
+
+### Features
+
+* small improvements and refactors ([6c17b06](https://www.github.com/conradludgate/oauth2-proxy/commit/6c17b066a721d317e75aa280794ae8608409b96e))
+
 ## [0.3.0](https://www.github.com/conradludgate/oauth2-proxy/compare/v0.2.0...v0.3.0) (2021-08-04)
 
 
