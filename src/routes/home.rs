@@ -6,12 +6,12 @@ use nitroglycerin::{
 use rocket::{http::Status, request::Request, State};
 use thiserror::Error;
 
-use crate::{config::Config, db::TokenUserIndex, login, templates, util::bail};
+use crate::{config::Config, db::Token, login, templates, util::bail};
 
 #[get("/")]
 pub async fn page(db: &State<DynamoDbClient>, config: &State<Config>, login_claims: login::Claims) -> Result<templates::Home, Error> {
     let login::Claims { username, .. } = login_claims;
-    let tokens = db.query::<TokenUserIndex>().username(username).execute().await?;
+    let tokens = db.query::<Token>().username(username).execute().await?;
 
     Ok(templates::Home {
         tokens: tokens.into_iter().map(|token| templates::HomeToken { id: token.token_id, name: token.name }).collect(),
@@ -33,7 +33,7 @@ pub enum Error {
 }
 impl<'r, 'o: 'r> Responder<'r, 'o> for Error {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
-        bail(self, Status::InternalServerError)
+        Err(bail(self, Status::InternalServerError))
     }
 }
 

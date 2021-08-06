@@ -54,12 +54,12 @@ pub enum CreateError {
 }
 impl<'r, 'o: 'r> Responder<'r, 'o> for CreateError {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
-        bail(self, Status::InternalServerError)
+        Err(bail(self, Status::InternalServerError))
     }
 }
 
 #[get("/token/<provider_id>", rank = 2)]
-pub fn new(config: &State<Config>, provider_id: String) -> Option<templates::NewToken> {
+pub fn new(config: &State<Config>, provider_id: String, _login_claims: login::Claims) -> Option<templates::NewToken> {
     let provider = config.providers.get(&provider_id)?;
     Some(templates::NewToken {
         provider_id,
@@ -68,8 +68,8 @@ pub fn new(config: &State<Config>, provider_id: String) -> Option<templates::New
 }
 
 #[get("/token/<token_id>")]
-pub async fn view(db: &State<DynamoDbClient>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, ViewError> {
-    fn result(token: Option<Token>) -> Option<templates::ViewToken> {
+pub async fn view(db: &State<DynamoDbClient>, config: &State<Config>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, ViewError> {
+    fn result(token: Option<Token>, baseurl: String) -> Option<templates::ViewToken> {
         let token = token?;
 
         Some(templates::ViewToken {
@@ -77,11 +77,21 @@ pub async fn view(db: &State<DynamoDbClient>, token_id: token::ID, login_claims:
             id: token.token_id,
             scopes: token.scopes,
             api_key: None,
+
+            username: token.username,
+            baseurl,
         })
     }
 
-    let token = db.get::<Token>().token_id(token_id).username(login_claims.username).execute().await?;
-    Ok(result(token))
+    let token = db.get::<Token>().username(login_claims.username).token_id(token_id).execute().await?;
+    Ok(result(token, config.base_url.to_string()))
+}
+
+#[get("/token/<token_id>", rank = 3)]
+pub async fn view_unauthenticated(token_id: token::ID) -> Redirect {
+    let redirect_to = uri!(view(token_id)).to_string();
+    let redirect = uri!(super::login::page(Some(redirect_to)));
+    Redirect::to(redirect)
 }
 
 #[derive(Debug, Error)]
@@ -91,13 +101,13 @@ pub enum ViewError {
 }
 impl<'r, 'o: 'r> Responder<'r, 'o> for ViewError {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
-        bail(self, Status::InternalServerError)
+        Err(bail(self, Status::InternalServerError))
     }
 }
 
 #[post("/token/<token_id>/delete")]
 pub async fn delete(db: &State<DynamoDbClient>, token_id: token::ID, login_claims: login::Claims) -> Result<Redirect, DeleteError> {
-    db.delete::<Token>().token_id(token_id).username(login_claims.username).execute().await?;
+    db.delete::<Token>().username(login_claims.username).token_id(token_id).execute().await?;
     Ok(Redirect::to(uri!(crate::routes::home::page)))
 }
 
@@ -108,13 +118,13 @@ pub enum DeleteError {
 }
 impl<'r, 'o: 'r> Responder<'r, 'o> for DeleteError {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
-        bail(self, Status::InternalServerError)
+        Err(bail(self, Status::InternalServerError))
     }
 }
 
 #[post("/token/<token_id>/revoke")]
-pub async fn revoke(db: &State<DynamoDbClient>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, RevokeError> {
-    let mut token = match db.get::<Token>().token_id(token_id).username(login_claims.username).execute().await? {
+pub async fn revoke(db: &State<DynamoDbClient>, config: &State<Config>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, RevokeError> {
+    let mut token = match db.get::<Token>().username(login_claims.username).token_id(token_id).execute().await? {
         Some(token) => token,
         None => return Ok(None),
     };
@@ -130,6 +140,9 @@ pub async fn revoke(db: &State<DynamoDbClient>, token_id: token::ID, login_claim
         id: token.token_id,
         scopes: token.scopes,
         api_key: Some(api_key),
+
+        username: token.username,
+        baseurl: config.base_url.to_string(),
     }))
 }
 
@@ -144,6 +157,6 @@ pub enum RevokeError {
 }
 impl<'r, 'o: 'r> Responder<'r, 'o> for RevokeError {
     fn respond_to(self, _r: &'r Request<'_>) -> rocket::response::Result<'o> {
-        bail(self, Status::InternalServerError)
+        Err(bail(self, Status::InternalServerError))
     }
 }

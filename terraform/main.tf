@@ -21,10 +21,10 @@ resource "aws_dynamodb_table" "users" {
   }
 }
 
-resource "aws_dynamodb_table" "tokens" {
-  name      = "Tokens"
-  hash_key  = "token_id"
-  range_key = "username"
+resource "aws_dynamodb_table" "token" {
+  name      = "Token"
+  hash_key  = "username"
+  range_key = "token_id"
 
   attribute {
     name = "token_id"
@@ -34,12 +34,5 @@ resource "aws_dynamodb_table" "tokens" {
   attribute {
     name = "username"
     type = "S"
-  }
-
-  global_secondary_index {
-    name               = "TokenUserIndex"
-    hash_key           = "username"
-    projection_type    = "INCLUDE"
-    non_key_attributes = ["name"]
   }
 }

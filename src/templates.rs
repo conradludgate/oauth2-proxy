@@ -36,12 +36,21 @@ pub struct ViewToken {
     pub id: Uuid,
     pub scopes: Vec<String>,
     pub api_key: Option<String>,
+
+    pub username: String,
+    pub baseurl: String,
 }
 
 #[derive(Template)]
 #[template(path = "login.html")]
-pub struct Login;
+pub struct Login {
+    pub error: Option<String>,
+    pub redirect_to: String,
+}
 
 #[derive(Template)]
 #[template(path = "register.html")]
-pub struct Register;
+pub struct Register {
+    pub error: Option<String>,
+    pub redirect_to: String,
+}

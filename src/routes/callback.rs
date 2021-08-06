@@ -49,6 +49,9 @@ pub async fn callback(config: &State<Config>, db: &State<DynamoDbClient>, code: 
         id: token.token_id.clone(),
         scopes: token.scopes.clone(),
         api_key: Some(api_key),
+        
+        username: token.username.clone(),
+        baseurl: config.base_url.to_string(),
     };
 
     db.put(token).execute().await?;
@@ -91,8 +94,8 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for HandlerError {
     fn respond_to(self, request: &'r Request<'_>) -> rocket::response::Result<'o> {
         match self {
             Self::Status(status) => status.respond_to(request),
-            Self::Jwt(_) | Self::Uuid(_) => bail(self, Status::BadRequest),
-            _ => bail(self, Status::InternalServerError),
+            Self::Jwt(_) | Self::Uuid(_) => Err(bail(self, Status::BadRequest)),
+            _ => Err(bail(self, Status::InternalServerError)),
         }
     }
 }

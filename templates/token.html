@@ -3,7 +3,7 @@
 {% block title %}Token {{ name }}{% endblock %}
 
 {% block content %}
-  <p>Token {{ name }}</p>
+  <p>Token {{ name }} ({{ id }})</p>
 
   <p>This token has access to the following scopes</p>
   <ul>
@@ -27,4 +27,11 @@
         <input type="submit" value="Revoke API Key" />
       </form>
   {% endmatch %}
+
+  <br/>
+  Usage example:
+
+  <code><pre>
+    curl -X POST '{{ baseurl }}api/v1/token/{{ id }}' --user '{{ username }}'
+  </pre></code>
 {% endblock %}

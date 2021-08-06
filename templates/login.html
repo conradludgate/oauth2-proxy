@@ -3,7 +3,14 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
-  <form action="/login" method="post">
+
+  {% match error %}
+    {% when Some with (error) %}
+      <p>{{ error }}</p>
+    {% when None %}
+  {% endmatch %}
+
+  <form action="/login?redirect_to={{ redirect_to }}" method="post">
     <label for="username">Username:</label><br />
     <input type="text" id="username" name="username" required /><br />
 
@@ -12,4 +19,6 @@
 
     <input type="submit" value="Login" />
   </form>
+
+  <a href="/register?redirect_to={{ redirect_to }}">Don't have an account?</a>
 {% endblock %}
