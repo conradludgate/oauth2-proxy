@@ -1196,6 +1196,8 @@ dependencies = [
 [[package]]
 name = "nitroglycerin"
 version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0811e5eb2f539dc7b9cedfab36a1c173f0880d7ff7e59cb4f8e2319f8fa1e6e3"
 dependencies = [
  "chrono",
  "nitroglycerin_derive",
@@ -1210,6 +1212,8 @@ dependencies = [
 [[package]]
 name = "nitroglycerin_derive"
 version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "557cab17d32a708c1f51fa0a96e04cf1ae078e0d6e43e7fb686486da0eccc58e"
 dependencies = [
  "proc-macro2",
  "quote",

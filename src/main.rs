@@ -5,7 +5,7 @@
 use std::net::SocketAddr;
 
 use config::Config;
-use metrics::{register_counter, register_gauge};
+use metrics::{Unit, register_counter, register_gauge, register_histogram};
 use nitroglycerin::dynamodb::DynamoDbClient;
 use rocket::fairing::AdHoc;
 use rusoto_core::Region;
@@ -13,6 +13,7 @@ use rusoto_core::Region;
 mod config;
 mod db;
 mod login;
+mod route_metrics;
 mod routes;
 mod templates;
 mod token;
@@ -37,9 +38,10 @@ fn rocket() -> _ {
 
     metrics_builder.install().expect("Could not install prometheus metrics exporter");
 
-    register_counter!("oauth2_proxy_users");
-    register_counter!("oauth2_proxy_token_exchanges");
-    register_gauge!("oauth2_proxy_tokens");
+    register_counter!("oauth2_proxy_users", Unit::Count);
+    register_counter!("oauth2_proxy_token_exchanges", Unit::Count);
+    register_gauge!("oauth2_proxy_tokens", Unit::Count);
+    register_histogram!("oauth2_proxy_route_durations", Unit::Nanoseconds);
 
     rocket::custom(figment)
         .attach(AdHoc::config::<Config>())
