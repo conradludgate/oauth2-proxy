@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://www.github.com/conradludgate/oauth2-proxy/compare/v0.4.0...v0.5.0) (2021-08-09)
+
+
+### Features
+
+* add prometheus metrics ([2732506](https://www.github.com/conradludgate/oauth2-proxy/commit/273250603bb750877cd98f0da9d9086082920742))
+
 ## [0.4.0](https://www.github.com/conradludgate/oauth2-proxy/compare/v0.3.0...v0.4.0) (2021-08-06)
 
 
