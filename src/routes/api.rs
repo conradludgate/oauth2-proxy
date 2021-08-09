@@ -1,5 +1,6 @@
 use askama_rocket::Responder;
 use chrono::{Duration, Utc};
+use metrics::increment_counter;
 use nitroglycerin::{
     dynamodb::{DynamoDbClient, GetItemError, PutItemError},
     DynamoDb, DynamoError,
@@ -80,6 +81,8 @@ pub async fn exchange(db: &State<DynamoDbClient>, config: &State<Config>, token_
 
         db.put(token.clone()).execute().await?;
     }
+
+    increment_counter!("oauth2_proxy_token_exchanges");
 
     Ok(Json(ExchangeResponse {
         access_token: token.access_token,

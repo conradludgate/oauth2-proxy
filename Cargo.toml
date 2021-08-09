@@ -23,9 +23,12 @@ askama = { git = "https://github.com/djc/askama" }
 askama_rocket = { git = "https://github.com/djc/askama" }
 
 rusoto_core = "0.47.0"
-nitroglycerin = { version = "0.4.3", features = ["uuid", "chrono", "oauth2"] }
+nitroglycerin = { version = "0.4.4", features = ["uuid", "chrono", "oauth2"] }
 
 uuid = { version = "0.8", features = ["v4"] }
 chrono = "0.4"
 base64 = "0.13"
 rand = "0.8.4"
+
+metrics = "0.17"
+metrics-exporter-prometheus = "0.6"

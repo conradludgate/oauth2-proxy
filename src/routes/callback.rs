@@ -1,6 +1,7 @@
 use askama_rocket::Responder;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, DecodingKey, Validation};
+use metrics::increment_gauge;
 use nitroglycerin::{
     dynamodb::{DynamoDbClient, PutItemError},
     DynamoDb, DynamoError,
@@ -49,12 +50,16 @@ pub async fn callback(config: &State<Config>, db: &State<DynamoDbClient>, code: 
         id: token.token_id.clone(),
         scopes: token.scopes.clone(),
         api_key: Some(api_key),
-        
+
         username: token.username.clone(),
         baseurl: config.base_url.to_string(),
     };
 
+    let provider_id = token.provider_id.clone();
+
     db.put(token).execute().await?;
+
+    increment_gauge!("oauth2_proxy_tokens", 1.0, "provider" => provider_id);
 
     Ok(template)
 }

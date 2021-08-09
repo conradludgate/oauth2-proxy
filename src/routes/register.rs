@@ -1,5 +1,6 @@
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
+use metrics::increment_counter;
 use nitroglycerin::{
     dynamodb::{DynamoDbClient, GetItemError, PutItemError},
     DynamoDb, DynamoError,
@@ -39,6 +40,8 @@ pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &
     cookies.add(Cookie::build("access_token", value).http_only(true).same_site(SameSite::Strict).secure(true).finish());
 
     let redirect_to = Origin::parse_owned(redirect_to).unwrap_or(uri!(crate::routes::home::page));
+
+    increment_counter!("oauth2_proxy_users");
 
     Ok(Redirect::to(redirect_to))
 }

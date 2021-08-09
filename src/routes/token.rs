@@ -1,6 +1,7 @@
 use askama_rocket::Responder;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
+use metrics::decrement_gauge;
 use nitroglycerin::{
     dynamodb::{DeleteItemError, DynamoDbClient, GetItemError, PutItemError},
     DynamoDb, DynamoError,
@@ -107,7 +108,10 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for ViewError {
 
 #[post("/token/<token_id>/delete")]
 pub async fn delete(db: &State<DynamoDbClient>, token_id: token::ID, login_claims: login::Claims) -> Result<Redirect, DeleteError> {
-    db.delete::<Token>().username(login_claims.username).token_id(token_id).execute().await?;
+    let token = db.delete::<Token>().username(login_claims.username).token_id(token_id).return_all_old().execute().await?;
+
+    decrement_gauge!("oauth2_proxy_tokens", 1.0, "provider" => token.provider_id);
+
     Ok(Redirect::to(uri!(crate::routes::home::page)))
 }
 
