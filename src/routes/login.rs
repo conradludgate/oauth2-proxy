@@ -16,7 +16,7 @@ use thiserror::Error;
 use crate::{config::Config, db::User, login, templates, util::bail};
 
 #[post("/login?<redirect_to>", data = "<login_data>")]
-pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &CookieJar<'_>, redirect_to: String, login_data: Form<Data>) -> Result<Redirect, Error> {
+pub async fn login_post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &CookieJar<'_>, redirect_to: String, login_data: Form<Data>) -> Result<Redirect, Error> {
     let Data { username, password } = login_data.into_inner();
     let user = db.get::<User>().username(&username).execute().await?;
     match user {
@@ -35,13 +35,13 @@ pub async fn post(db: &State<DynamoDbClient>, config: &State<Config>, cookies: &
     let value = encode(&Header::default(), &claims, &EncodingKey::from_base64_secret(&config.state_key)?)?;
     cookies.add(Cookie::build("access_token", value).http_only(true).same_site(SameSite::Strict).secure(true).finish());
 
-    let redirect_to = Origin::parse_owned(redirect_to).unwrap_or(uri!(crate::routes::home::page));
+    let redirect_to = Origin::parse_owned(redirect_to).unwrap_or(uri!(crate::routes::home::home_page));
 
     Ok(Redirect::to(redirect_to))
 }
 
 #[get("/login?<redirect_to>")]
-pub fn page(redirect_to: Option<String>) -> templates::Login {
+pub fn login_page(redirect_to: Option<String>) -> templates::Login {
     let redirect_to = redirect_to.unwrap_or_else(|| "/".to_owned());
     templates::Login { error: None, redirect_to }
 }

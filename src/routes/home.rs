@@ -9,7 +9,7 @@ use thiserror::Error;
 use crate::{config::Config, db::Token, login, templates, util::bail};
 
 #[get("/")]
-pub async fn page(db: &State<DynamoDbClient>, config: &State<Config>, login_claims: login::Claims) -> Result<templates::Home, Error> {
+pub async fn home_page(db: &State<DynamoDbClient>, config: &State<Config>, login_claims: login::Claims) -> Result<templates::Home, Error> {
     let login::Claims { username, .. } = login_claims;
     let tokens = db.query::<Token>().username(username).execute().await?;
 

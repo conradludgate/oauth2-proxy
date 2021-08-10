@@ -74,7 +74,7 @@ pub fn random_key() -> [u8; 48] {
 }
 
 #[get("/callback?<error>", rank = 2)]
-pub fn error(error: &str) -> Status {
+pub fn callback_error(error: &str) -> Status {
     warn!("callback_error: {}", error);
     Status::Unauthorized
 }
