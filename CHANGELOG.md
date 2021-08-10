@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://www.github.com/conradludgate/oauth2-proxy/compare/v0.5.0...v0.6.0) (2021-08-10)
+
+
+### Features
+
+* add route metrics ([a25f6f2](https://www.github.com/conradludgate/oauth2-proxy/commit/a25f6f2ed163dd3da8cbdfcb433179fec5d02ce1))
+* more metrics ([b0fd9dc](https://www.github.com/conradludgate/oauth2-proxy/commit/b0fd9dc8d375be366266ebf7b68a9fa8ab5a9976))
+
 ## [0.5.0](https://www.github.com/conradludgate/oauth2-proxy/compare/v0.4.0...v0.5.0) (2021-08-09)
 
 
