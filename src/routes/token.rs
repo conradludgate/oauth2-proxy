@@ -19,7 +19,7 @@ use thiserror::Error;
 use crate::{config::Config, db::Token, login, routes::callback::random_key, templates, token, util::bail};
 
 #[post("/token", data = "<token_data>")]
-pub async fn create(config: &State<Config>, login_claims: login::Claims, token_data: Form<token::Data>) -> Result<Redirect, CreateError> {
+pub async fn token_create(config: &State<Config>, login_claims: login::Claims, token_data: Form<token::Data>) -> Result<Redirect, CreateError> {
     let token::Data { name, provider_id, scopes } = token_data.into_inner();
 
     let claims = token::Claims {
@@ -60,7 +60,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for CreateError {
 }
 
 #[get("/token/<provider_id>", rank = 2)]
-pub fn new(config: &State<Config>, provider_id: String, _login_claims: login::Claims) -> Option<templates::NewToken> {
+pub fn token_new_page(config: &State<Config>, provider_id: String, _login_claims: login::Claims) -> Option<templates::NewToken> {
     let provider = config.providers.get(&provider_id)?;
     Some(templates::NewToken {
         provider_id,
@@ -69,7 +69,7 @@ pub fn new(config: &State<Config>, provider_id: String, _login_claims: login::Cl
 }
 
 #[get("/token/<token_id>")]
-pub async fn view(db: &State<DynamoDbClient>, config: &State<Config>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, ViewError> {
+pub async fn token_view(db: &State<DynamoDbClient>, config: &State<Config>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, ViewError> {
     fn result(token: Option<Token>, baseurl: String) -> Option<templates::ViewToken> {
         let token = token?;
 
@@ -89,9 +89,9 @@ pub async fn view(db: &State<DynamoDbClient>, config: &State<Config>, token_id: 
 }
 
 #[get("/token/<token_id>", rank = 3)]
-pub async fn view_unauthenticated(token_id: token::ID) -> Redirect {
-    let redirect_to = uri!(view(token_id)).to_string();
-    let redirect = uri!(super::login::page(Some(redirect_to)));
+pub async fn token_view_unauthenticated(token_id: token::ID) -> Redirect {
+    let redirect_to = uri!(token_view(token_id)).to_string();
+    let redirect = uri!(super::login::login_page(Some(redirect_to)));
     Redirect::to(redirect)
 }
 
@@ -107,12 +107,12 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for ViewError {
 }
 
 #[post("/token/<token_id>/delete")]
-pub async fn delete(db: &State<DynamoDbClient>, token_id: token::ID, login_claims: login::Claims) -> Result<Redirect, DeleteError> {
+pub async fn token_delete(db: &State<DynamoDbClient>, token_id: token::ID, login_claims: login::Claims) -> Result<Redirect, DeleteError> {
     let token = db.delete::<Token>().username(login_claims.username).token_id(token_id).return_all_old().execute().await?;
 
     decrement_gauge!("oauth2_proxy_tokens", 1.0, "provider" => token.provider_id);
 
-    Ok(Redirect::to(uri!(crate::routes::home::page)))
+    Ok(Redirect::to(uri!(crate::routes::home::home_page)))
 }
 
 #[derive(Debug, Error)]
@@ -127,7 +127,7 @@ impl<'r, 'o: 'r> Responder<'r, 'o> for DeleteError {
 }
 
 #[post("/token/<token_id>/revoke")]
-pub async fn revoke(db: &State<DynamoDbClient>, config: &State<Config>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, RevokeError> {
+pub async fn token_revoke(db: &State<DynamoDbClient>, config: &State<Config>, token_id: token::ID, login_claims: login::Claims) -> Result<Option<templates::ViewToken>, RevokeError> {
     let mut token = match db.get::<Token>().username(login_claims.username).token_id(token_id).execute().await? {
         Some(token) => token,
         None => return Ok(None),
