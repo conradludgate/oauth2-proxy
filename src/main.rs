@@ -45,6 +45,7 @@ fn rocket() -> _ {
 
     rocket::custom(figment)
         .attach(AdHoc::config::<Config>())
+        .attach(route_metrics::RouteMetrics)
         .manage(DynamoDbClient::new(Region::default()))
         .mount("/", routes::routes())
 }

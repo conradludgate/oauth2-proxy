@@ -2,7 +2,7 @@ use metrics::histogram;
 use rocket::{Request, Data, Response};
 use rocket::fairing::{Fairing, Info, Kind};
 
-struct RouteMetrics;
+pub struct RouteMetrics;
 struct RouteInstance(std::time::Instant);
 
 fn time() -> RouteInstance {
@@ -26,6 +26,11 @@ impl Fairing for RouteMetrics {
         let start = request.local_cache(time);
         let duration = time().0.duration_since(start.0.to_owned());
 
-        histogram!("oauth2_proxy_route_durations", duration, "route" => request.route().unwrap().to_string(), "status" => response.status().to_string());
+        let status = response.status().code;
+        let route = request.route().unwrap();
+        let method = route.method;
+        let name = route.name.clone().unwrap();
+
+        histogram!("oauth2_proxy_route_durations", duration, "method" => method.to_string(), "route" => name, "status" => status.to_string());
     }
 }
