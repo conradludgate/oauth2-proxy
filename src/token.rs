@@ -1,52 +1,47 @@
-use std::{
-    fmt::{self, Write},
-    str::FromStr,
-    time::Duration,
-};
+use std::time::Duration;
 
 use chrono::Utc;
 use oauth2::{
     basic::{BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse, BasicTokenType},
     AccessToken, AuthUrl, ClientId, ClientSecret, RedirectUrl, RefreshToken, Scope, StandardRevocableToken, TokenResponse, TokenUrl,
 };
-use rocket::{
-    http::{
-        impl_from_uri_param_identity,
-        uri::fmt::{Formatter, Part, UriDisplay},
-    },
-    request::FromParam,
-};
+// use rocket::{
+//     http::{
+//         impl_from_uri_param_identity,
+//         uri::fmt::{Formatter, Part, UriDisplay},
+//     },
+//     request::FromParam,
+// };
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+// use uuid::Uuid;
 
-pub struct ID(Uuid);
-impl From<ID> for Uuid {
-    fn from(u: ID) -> Self {
-        u.0
-    }
-}
-#[async_trait]
-impl<'a> FromParam<'a> for ID {
-    type Error = <Uuid as FromStr>::Err;
+// pub struct ID(Uuid);
+// impl From<ID> for Uuid {
+//     fn from(u: ID) -> Self {
+//         u.0
+//     }
+// }
+// #[async_trait]
+// impl<'a> FromParam<'a> for ID {
+//     type Error = <Uuid as FromStr>::Err;
 
-    fn from_param(param: &'a str) -> Result<Self, Self::Error> {
-        param.parse().map(ID)
-    }
-}
+//     fn from_param(param: &'a str) -> Result<Self, Self::Error> {
+//         param.parse().map(ID)
+//     }
+// }
 
-impl<P: Part> UriDisplay<P> for ID {
-    fn fmt(&self, f: &mut Formatter<'_, P>) -> fmt::Result {
-        f.write_str(&self.0.to_string())
-    }
-}
-impl_from_uri_param_identity!(ID);
+// impl<P: Part> UriDisplay<P> for ID {
+//     fn fmt(&self, f: &mut Formatter<'_, P>) -> fmt::Result {
+//         f.write_str(&self.0.to_string())
+//     }
+// }
+// impl_from_uri_param_identity!(ID);
 
-#[derive(FromForm)]
-pub struct Data {
-    pub name: String,
-    pub provider_id: String,
-    pub scopes: Vec<String>,
-}
+// pub struct Data {
+//     pub name: String,
+//     pub provider_id: String,
+//     pub scopes: Vec<String>,
+// }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
