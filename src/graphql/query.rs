@@ -1,9 +1,8 @@
 use async_graphql::{Context, Object, Result, SimpleObject};
-use nitroglycerin::{DynamoDb, dynamodb::DynamoDbClient};
+use nitroglycerin::{dynamodb::DynamoDbClient, DynamoDb};
 
-use crate::db;
-
-use super::provider::{Provider};
+// use super::provider::Provider;
+use crate::{db, provider::{ScopeCollection, Scopes, spotify::SpotifyScope}};
 
 pub struct Query {
     pub db: DynamoDbClient,
@@ -15,10 +14,7 @@ impl Query {
         "0.1.0".to_string()
     }
 
-    async fn tokens(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Vec<Token>> {
+    async fn tokens(&self, ctx: &Context<'_>) -> Result<Vec<Token>> {
         let user = ctx.data_opt::<User>().ok_or_else(|| "Forbidden")?;
         let tokens = self
             .db
@@ -38,13 +34,14 @@ impl Query {
         let token = self
             .db
             .get::<db::Token>()
-            .username(&user.0)
-            .token_id(id)
+            .username(&user.0)?
+            .token_id(&id)?
             .execute()
             .await?
+            .map(Token::from)
             .ok_or_else(|| "Not Found")?;
 
-        Ok(token.into())
+        Ok(token)
     }
 }
 
@@ -52,8 +49,7 @@ impl Query {
 struct Token {
     id: uuid::Uuid,
     name: String,
-    scopes: Vec<String>,
-    provider: Provider,
+    scopes: Scopes,
 }
 
 impl From<db::Token> for Token {
@@ -62,7 +58,6 @@ impl From<db::Token> for Token {
             id: t.token_id,
             name: t.name,
             scopes: t.scopes,
-            provider: Provider::new(&t.provider_id).unwrap(),
         }
     }
 }

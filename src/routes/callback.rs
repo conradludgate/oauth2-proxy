@@ -79,36 +79,6 @@ pub fn callback_error(error: &str) -> Status {
     Status::Unauthorized
 }
 
-impl Type for Provider {
-    fn type_name() -> Cow<'static, str> {
-        "Provider".into()
-    }
-
-    fn create_type_info(registry: &mut async_graphql::registry::Registry) -> String {
-        registry.create_type::<Self, _>(|registry| {
-            async_graphql::registry::MetaType::Enum {
-                name: "Provider".into(),
-                description: "Enumeration of Oauth2.0 Providers",
-                enum_values: {
-                    let mut enum_items = async_graphql::indexmap::IndexMap::new();
-
-                    PROVIDER_ITEMS.iter().for_each(|item| {
-                        enum_items.insert(item.name, async_graphql::registry::MetaEnumValue {
-                            name: item.name,
-                            description: format!("Oauth2.0 Provider {}", item.name),
-                            deprecation: false,
-                            visible: true,
-                        });
-                    });
-
-                    enum_items
-                },
-                visible: true,
-            }
-        })
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum HandlerError {
     #[error("error exchanging oauth2 token {0}")]

@@ -1,8 +1,8 @@
-use std::{collections::HashMap, fs::File, io::Read, lazy::SyncLazy};
+use std::lazy::SyncLazy;
 
 use serde::Deserialize;
 
-use crate::token::Provider;
+use crate::{provider::spotify::SpotifyProvider, token::Provider};
 
 #[inline]
 fn base_url() -> oauth2::url::Url {
@@ -24,12 +24,10 @@ pub struct Config {
     #[serde(default = "base_url")]
     pub base_url: oauth2::url::Url,
 
-    pub providers: HashMap<String, Provider>,
+    pub spotify: Provider<SpotifyProvider>,
 }
 
 pub static CONFIG: SyncLazy<Config> = SyncLazy::new(|| {
-    let mut config_file = File::open("config.toml").expect("config.toml file not found");
-    let mut config_str = String::new();
-    config_file.read_to_string(&mut config_str).expect("could not read config file");
+    let config_str = std::fs::read_to_string("config.toml").expect("could not read config file");
     toml::from_str(&config_str).expect("could not parse config file")
 });

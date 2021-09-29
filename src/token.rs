@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
 use chrono::Utc;
 use oauth2::{
@@ -13,6 +13,8 @@ use oauth2::{
 //     request::FromParam,
 // };
 use serde::{Deserialize, Serialize};
+
+use crate::provider::{self, Scopes};
 // use uuid::Uuid;
 
 // pub struct ID(Uuid);
@@ -46,8 +48,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub name: String,
-    pub provider_id: String,
-    pub scopes: Vec<String>,
+    pub scopes: Scopes,
 
     #[serde(rename = "sub")]
     pub username: String,
@@ -57,13 +58,11 @@ pub struct Claims {
 }
 
 #[derive(Deserialize)]
-pub struct Provider {
-    pub name: String,
+pub struct Provider<P> {
     pub client_id: String,
     pub client_secret: String,
-    pub auth_url: oauth2::url::Url,
-    pub token_url: oauth2::url::Url,
-    pub scopes: Vec<String>,
+    #[serde(skip)]
+    _provider: PhantomData<P>,
 }
 
 type OauthClient = oauth2::Client<BasicErrorResponse, SimpleTokenResponse, BasicTokenType, BasicTokenIntrospectionResponse, StandardRevocableToken, BasicRevocationErrorResponse>;
@@ -95,7 +94,7 @@ impl TokenResponse<BasicTokenType> for SimpleTokenResponse {
     }
 }
 
-impl Provider {
+impl<P: provider::Provider> Provider<P> {
     pub fn oauth2_client(&self, base_url: oauth2::url::Url) -> OauthClient {
         let mut redirect = base_url;
         redirect.set_path("/callback");
@@ -103,8 +102,8 @@ impl Provider {
         OauthClient::new(
             ClientId::new(self.client_id.clone()),
             Some(ClientSecret::new(self.client_secret.clone())),
-            AuthUrl::from_url(self.auth_url.clone()),
-            Some(TokenUrl::from_url(self.token_url.clone())),
+            AuthUrl::from_url(oauth2::url::Url::parse(P::AUTH_URL).expect("could not parse auth url")),
+            Some(TokenUrl::from_url(oauth2::url::Url::parse(P::TOKEN_URL).expect("could not parse token url"))),
         )
         .set_redirect_uri(RedirectUrl::from_url(redirect))
     }

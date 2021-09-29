@@ -1,15 +1,18 @@
-use nitroglycerin::{Attributes, Key, Query, Table};
+use nitroglycerin::{Key, Query, Table};
 use oauth2::{basic::BasicTokenType, AccessToken, RefreshToken};
 use uuid::Uuid;
+use nitroglycerin::serde::{Deserialize, Serialize};
 
-#[derive(Attributes, Key)]
+use crate::provider::Scopes;
+
+#[derive(Serialize, Deserialize, Key)]
 pub struct User {
     #[nitro(partition_key)]
     pub username: String,
     pub password_hash: String,
 }
 
-#[derive(Clone, Attributes, Key, Query)]
+#[derive(Clone, Serialize, Deserialize, Key, Query)]
 pub struct Token {
     #[nitro(partition_key)]
     pub username: String,
@@ -17,8 +20,8 @@ pub struct Token {
     #[nitro(sort_key)]
     pub token_id: Uuid,
     pub name: String,
-    pub provider_id: String,
-    pub scopes: Vec<String>,
+
+    pub scopes: Scopes,
 
     pub key_hash: String,
 
@@ -37,6 +40,6 @@ impl Table for User {
 
 impl Table for Token {
     fn table_name() -> String {
-        "Token".to_string()
+        "Tokens".to_string()
     }
 }

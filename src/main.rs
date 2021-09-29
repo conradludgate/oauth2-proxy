@@ -7,13 +7,19 @@ use actix_web::{App, HttpServer};
 use nitroglycerin::dynamodb::DynamoDbClient;
 use rusoto_core::Region;
 use tracing_actix_web::TracingLogger;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod actix_web_graphql;
 mod graphql;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    tracing_subscriber::fmt::init();
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let tracer = opentelemetry_jaeger::new_pipeline()
+        .with_service_name("report_example")
+        .install_batch(opentelemetry::runtime::Tokio)?;
+    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+    tracing_subscriber::registry().with(telemetry).try_init()?;
+
     let db = DynamoDbClient::new(Region::default());
     let graphql = graphql::Service::new(db);
 
@@ -24,7 +30,9 @@ async fn main() -> std::io::Result<()> {
     })
     .bind(("0.0.0.0", 8080))?
     .run()
-    .await
+    .await?;
+
+    Ok(())
 }
 
 // use std::net::SocketAddr;
@@ -38,6 +46,7 @@ async fn main() -> std::io::Result<()> {
 mod config;
 mod db;
 mod login;
+mod provider;
 // mod route_metrics;
 // mod routes;
 // mod templates;
